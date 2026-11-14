@@ -1,0 +1,1296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F6F8FB">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="레디맵">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>레디맵 ReadyMap</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<style>
+/* Layout: 전체 화면 지도 위에 검색창·패널·탭을 띄운다. 넓은 화면은 왼쪽 패널, 좁은 화면은 하단 시트. */
+:root{
+  --bg:#E9EDF2; --panel:#F6F8FB; --card:#FFFFFF; --line:#D5DCE5; --fg:#111A26; --muted:#566475; --faint:#8490A0;
+  --accent:#1F4FD8; --accent-fg:#FFFFFF; --accent-soft:#E3EAFC;
+  --warn:#A65F00; --warn-soft:#FCEFD8; --crit:#C22B38; --crit-soft:#FBE4E6; --ok:#0A7A50; --ok-soft:#DDF3E9;
+  --road:#BCC6D3; --land:#DFE5EC; --water:#C6DAF0;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 28px rgba(16,24,40,.10); --scrim:rgba(10,16,26,.55);
+  --font:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --display:'Space Grotesk','IBM Plex Sans KR','Malgun Gothic',sans-serif;
+  --mono:ui-monospace,'SFMono-Regular',Consolas,'Malgun Gothic',monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#090D13; --panel:#10161F; --card:#18202D; --line:#2A3445; --fg:#E8EDF4; --muted:#9BA8B9; --faint:#6F7C8E;
+  --accent:#86A8FF; --accent-fg:#0A1020; --accent-soft:#1B2A4D;
+  --warn:#FFB454; --warn-soft:#3A2A10; --crit:#FF7F8A; --crit-soft:#3D1A1F; --ok:#4FD6A0; --ok-soft:#113327;
+  --road:#3B475A; --land:#151D29; --water:#14263D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.4); --scrim:rgba(0,0,0,.6); color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#090D13; --panel:#10161F; --card:#18202D; --line:#2A3445; --fg:#E8EDF4; --muted:#9BA8B9; --faint:#6F7C8E;
+  --accent:#86A8FF; --accent-fg:#0A1020; --accent-soft:#1B2A4D;
+  --warn:#FFB454; --warn-soft:#3A2A10; --crit:#FF7F8A; --crit-soft:#3D1A1F; --ok:#4FD6A0; --ok-soft:#113327;
+  --road:#3B475A; --land:#151D29; --water:#14263D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.4); --scrim:rgba(0,0,0,.6); color-scheme:dark }
+:root{--side:384px;--con:0px;--top:max(12px,env(safe-area-inset-top,0px));--bot:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.5;overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+input{font:inherit;color:inherit}
+button:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+#map{position:fixed;inset:0}
+.fatal{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;font-weight:600}
+.glass{background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+
+/* 검색창 · 칩 · 떠 있는 버튼 */
+.search{position:fixed;z-index:4;top:var(--top);left:12px;right:12px;display:flex;gap:8px;align-items:center}
+.pill{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:52px;padding:0 6px 0 11px;border-radius:26px}
+.pill input{flex:1;min-width:0;border:0;background:none;outline:0;font-size:16px;font-weight:500}
+.pill input::placeholder{color:var(--faint)}
+.pill input::-webkit-search-cancel-button{display:none}
+.pill:focus-within{border-color:var(--accent)}
+.logo{width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
+.icb{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--muted);flex:none}
+.icb:hover{background:var(--panel)}
+.go{width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none;box-shadow:var(--shadow)}
+.chips{position:fixed;z-index:4;top:calc(var(--top) + 60px);left:0;right:0;display:flex;gap:8px;padding:0 12px 4px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;height:36px;padding:0 13px;border-radius:18px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chips button.unset{color:var(--faint)}
+.fabs{position:fixed;z-index:4;right:calc(12px + var(--con));top:calc(var(--top) + 108px);display:flex;flex-direction:column;gap:10px}
+.fab{width:46px;height:46px;border-radius:50%;display:grid;place-items:center}
+.fab.on{color:var(--accent);border-color:var(--accent)}
+
+/* 패널 · 탭 */
+.panel{position:fixed;z-index:5;left:0;right:0;bottom:calc(60px + var(--bot));max-height:46dvh;border-radius:20px 20px 0 0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)}
+.grab{height:22px;flex:none;display:grid;place-items:center;width:100%}
+.grab::before{content:"";width:40px;height:4px;border-radius:4px;background:var(--line)}
+#view{overflow:auto;padding:2px 14px 16px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.panel.collapsed #view{max-height:58px;overflow:hidden}
+.tabs{position:fixed;z-index:5;left:0;right:0;bottom:0;height:calc(60px + var(--bot));padding-bottom:var(--bot);display:flex;background:var(--card);border-top:1px solid var(--line)}
+.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.tabs button.on{color:var(--accent)}
+@media (min-width:760px){
+  .search,.chips{right:auto;width:var(--side);left:14px}
+  .chips{padding:0 0 4px}
+  .panel{left:14px;right:auto;width:var(--side);top:calc(var(--top) + 108px);bottom:auto;max-height:calc(100dvh - var(--top) - 196px);border-radius:20px}
+  .grab{display:none} #view{padding-top:14px} .panel.collapsed #view{max-height:none;overflow:auto}
+  .tabs{left:14px;right:auto;width:var(--side);bottom:14px;height:60px;border-radius:20px;border:1px solid var(--line);box-shadow:var(--shadow);padding:0}
+  .fabs{top:var(--top)}
+}
+
+/* 공통 부품 */
+.h{font-size:18px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.note{font-size:12.5px;color:var(--muted)}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.04em;color:var(--faint)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:10px;font-weight:600;font-size:13px;background:var(--card);border:1px solid var(--line);min-height:38px;white-space:nowrap}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.sm{padding:5px 10px;min-height:32px;font-size:12.5px;border-radius:8px}
+.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.btn.danger{color:var(--crit);border-color:var(--crit)}
+.btn.grow{flex:1}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--card);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.chip.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card h3{font-size:15px;font-weight:700}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;width:100%}
+.item .txt{min-width:0;flex:1}
+.item .txt b{display:block;overflow-wrap:anywhere}
+button.item:hover{border-color:var(--accent)}
+.ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--warn-soft);color:var(--warn);flex:none}
+.ico.school{background:var(--crit-soft);color:var(--crit)} .ico.cam,.ico.plain{background:var(--accent-soft);color:var(--accent)}
+.stat{font-family:var(--display);font-size:24px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.stat small{font-family:var(--font);font-size:12.5px;font-weight:500;color:var(--muted);margin-left:3px}
+.tiles{display:grid;gap:8px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 13px}
+.banner{border-radius:12px;padding:10px 12px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:13px}
+.banner.err{background:var(--crit-soft);color:var(--crit)}
+.opt{flex:1 1 150px;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:11px 13px}
+.opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{padding:6px 11px;border-radius:10px;border:1px dashed var(--line);font-size:12.5px;font-weight:600;color:var(--faint)}
+.badge.got{border-style:solid;border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:2px;gap:2px;flex-wrap:wrap}
+.seg button{padding:5px 10px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);min-height:28px}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.switch .seg{flex:none;flex-wrap:nowrap}
+.tog{width:44px;height:26px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--card);box-shadow:var(--shadow);transition:left .15s}
+.tog.on{background:var(--accent)} .tog.on::after{left:21px}
+details.line{background:var(--card);border:1px solid var(--line);border-radius:12px}
+details.line summary{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;font-weight:700;list-style:none}
+details.line summary::-webkit-details-marker{display:none}
+details.line summary .nm{flex:1;min-width:0}
+details.line .cz{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:13px}
+details.line .cz .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+details.line .cz b{font-family:var(--display);font-variant-numeric:tabular-nums}
+.busy{display:flex;gap:10px;align-items:center;font-weight:600;padding:8px 0}
+.spin{width:18px;height:18px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* 지도 마커 */
+.mk{display:grid;place-items:center;cursor:pointer}
+.mk.hz{width:30px;height:30px;border-radius:50%;background:#D97706;color:#fff;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.mk.hz.school{background:#D0323F} .mk.hz.cam{background:#2456D6}
+.mk.pin{padding:3px 10px;border-radius:14px;font-size:12px;font-weight:700;color:#fff;background:#1B2432;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.mk.pin.dest{background:#D0323F}
+.mk.car{width:38px;height:38px;border-radius:50%;background:#1F4FD8;color:#fff;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+.mk.me{width:18px;height:18px;border-radius:50%;background:#1F7AFF;border:3px solid #fff;box-shadow:0 0 0 6px rgba(31,122,255,.25)}
+.mk.sel{width:20px;height:20px;border-radius:50%;background:#1B2432;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.mk.pt{width:26px;height:26px;border-radius:50%;background:rgba(217,119,6,.5);border:3px solid #D97706}
+.mk.pt.pend{background:rgba(255,255,255,.6);border-style:dashed;border-color:#6B7686}
+
+/* 주행 화면 */
+.hud-top{position:fixed;z-index:4;top:var(--top);left:12px;width:min(430px,calc(100vw - 24px - var(--con)));display:flex;flex-direction:column;gap:8px}
+.tbt{display:flex;gap:12px;align-items:center;background:var(--accent);color:var(--accent-fg);border-radius:18px;padding:12px 16px;box-shadow:var(--shadow)}
+.tbt .arr{width:50px;height:50px;flex:none;display:grid;place-items:center}
+.tbt .arr svg{transition:transform .25s}
+.tbt-d{font-family:var(--display);font-size:30px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
+.tbt-t{font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.dcard{border-radius:16px;padding:12px 14px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;gap:12px;align-items:center}
+.dcard .big{font-size:17px;font-weight:700;line-height:1.3}
+.dcard.warn{background:var(--warn-soft);border-color:var(--warn)} .dcard.warn .big{color:var(--warn)}
+.dcard.ask{background:var(--accent-soft);border-color:var(--accent)} .dcard.ask .big{color:var(--accent)}
+.dcard.ok{background:var(--ok-soft);border-color:var(--ok)} .dcard.ok .big{color:var(--ok)}
+.hud-bot{position:fixed;z-index:4;left:0;right:var(--con);bottom:0;padding:10px 12px calc(10px + var(--bot));background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap}
+.spd{width:62px;height:62px;border-radius:50%;border:3px solid var(--line);display:grid;place-items:center;text-align:center;line-height:1;flex:none}
+.spd b{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums;display:block}.spd small{font-size:10px;color:var(--muted)}
+.cam{width:50px;height:50px;border-radius:50%;border:5px solid #D0323F;background:#fff;color:#111;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:17px;flex:none}
+.eta{flex:1 1 130px;min-width:0}
+.eta b{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
+body:not(.driving) .hud-top,body:not(.driving) .hud-bot{display:none}
+body.driving .search,body.driving .chips,body.driving .panel,body.driving .tabs,body.driving .nd{display:none}
+body.driving .fabs{top:auto;bottom:calc(210px + var(--bot))}
+@media (min-width:760px){ body.driving .fabs{top:var(--top);bottom:auto} }
+
+/* 음성 자막 · 토스트 · 시뮬레이션 */
+.voice{background:var(--fg);color:var(--panel);border-radius:14px;padding:10px 14px;font-weight:600;font-size:14px;display:flex;gap:9px;align-items:flex-start;box-shadow:var(--shadow)}
+.voice.strong{background:var(--warn)}
+body>.voice{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(72px + var(--bot));width:min(430px,calc(100vw - 24px))}
+.toast{position:fixed;z-index:9;left:50%;transform:translateX(-50%);top:calc(var(--top) + 62px);background:var(--fg);color:var(--panel);border-radius:10px;padding:8px 13px;font-size:13px;font-weight:600;box-shadow:var(--shadow);max-width:min(90vw,460px);text-align:center}
+.modal{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;padding:14px;z-index:8}
+.sim{background:var(--card);border-radius:16px;border:1px solid var(--line);width:min(100%,760px);max-height:100%;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.sim canvas{width:100%;aspect-ratio:16/9;border-radius:12px;display:block;background:#3E4B47}
+.cap{font-weight:600;font-size:14.5px;min-height:44px}
+.prog{height:4px;background:var(--line);border-radius:9px;overflow:hidden}.prog i{display:block;height:100%;width:0;background:var(--accent)}
+
+/* 가상 차량 콘솔 */
+.console{position:fixed;z-index:6;top:0;right:0;bottom:0;width:min(330px,100vw);background:var(--panel);border-left:1px solid var(--line);padding:14px 14px calc(14px + var(--bot));display:flex;flex-direction:column;gap:12px;overflow:auto;transform:translateX(100%);visibility:hidden;transition:transform .2s,visibility .2s}
+body.con-open .console{transform:none;visibility:visible}
+@media (min-width:1000px){ body.con-open{--con:330px} }
+.console h2{font-size:15px;font-weight:700}
+.grp{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--line)}
+.grp label,.lab{font-size:12px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.grp output{font-family:var(--display);font-variant-numeric:tabular-nums;color:var(--fg)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.log{font-family:var(--mono);font-size:11.5px;line-height:1.55;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;height:200px;flex:none;overflow:auto;overflow-wrap:anywhere}
+.log b{color:var(--accent);font-weight:600} .log .t{color:var(--faint)}
+.maplibregl-ctrl-bottom-right{right:var(--con);bottom:calc(60px + var(--bot))}
+@media (min-width:760px){ .maplibregl-ctrl-bottom-right{bottom:0} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="지도"></div>
+
+<header class="search">
+  <div class="pill glass">
+    <span class="logo" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c0-7 4-9 8-9s8-2 8-7"/><circle cx="12" cy="11" r="2.4" fill="currentColor"/></svg></span>
+    <input id="q" type="search" placeholder="목적지 검색" autocomplete="off" enterkeyhint="search" aria-label="목적지 검색">
+    <button class="icb" id="btnClear" data-act="clearQ" aria-label="검색어 지우기" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <button class="icb" id="btnMic" data-act="mic" aria-label="음성으로 검색" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+  </div>
+  <button class="go" data-act="routeBtn" aria-label="길찾기" title="길찾기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19v-5a4 4 0 0 1 4-4h10M15 6l4 4-4 4"/></svg></button>
+</header>
+<div class="chips" id="chips"></div>
+
+<div class="fabs">
+  <button class="fab glass" id="fabCon" data-act="console" aria-label="가상 차량 콘솔" title="가상 차량 콘솔"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3l2-5h12l2 5v3M4 16h16M4 16v2M20 16v2M7 13h.01M17 13h.01"/></svg></button>
+  <button class="fab glass" id="fabMute" data-act="mute" aria-label="음성 안내 켜기/끄기" title="음성 안내 켜기/끄기"></button>
+  <button class="fab glass nd" data-act="locate" aria-label="내 위치를 출발지로" title="내 위치를 출발지로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+</div>
+
+<section class="panel" id="panel" aria-label="안내 패널">
+  <button class="grab" data-act="collapse" aria-label="패널 접기/펼치기"></button>
+  <div id="view"></div>
+</section>
+<nav class="tabs" id="tabs" aria-label="메뉴"></nav>
+
+<div class="hud-top" id="hudTop">
+  <div class="tbt"><span class="arr" id="tbtIco"></span><div style="min-width:0"><div class="tbt-d" id="tbtDist"></div><div class="tbt-t" id="tbtText"></div></div></div>
+  <div class="dcard" id="dCard" hidden><div style="min-width:0"><div class="big" id="dBig"></div><div class="note" id="dSub"></div></div></div>
+</div>
+<div class="hud-bot">
+  <div class="spd"><div><b id="dSpd">0</b><small>km/h</small></div></div>
+  <div class="cam" id="dCam" hidden title="과속 단속 카메라"></div>
+  <div class="eta"><div><b id="dEta">--:--</b> 도착 예정</div><div class="note" id="dRemain"></div></div>
+  <span class="chip" id="chipCruise">크루즈 꺼짐</span>
+  <div class="row">
+    <button class="btn sm" data-act="cruiseOn" id="qCruise">크루즈 켜기</button>
+    <button class="btn sm" data-act="brakeToggle" id="qBrake">브레이크 밟기</button>
+    <button class="btn sm" data-act="say" data-arg="준비">“준비”</button>
+    <span class="seg" id="qScale"></span>
+    <button class="btn sm danger" data-act="end">안내 종료</button>
+  </div>
+</div>
+
+<div class="voice" id="voice" hidden role="status" aria-live="polite"></div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<div class="modal" id="simModal" hidden>
+  <div class="sim" role="dialog" aria-label="상황 시뮬레이션">
+    <div class="row between"><div style="min-width:0"><div class="eyebrow" id="simKind">시뮬레이션</div><h3 id="simTitle" style="font-size:16px;font-weight:700"></h3></div><div class="row" id="simEnv"></div></div>
+    <canvas id="simCanvas" width="960" height="540"></canvas>
+    <div class="prog"><i id="simProg"></i></div>
+    <div class="cap" id="simCap"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn sm" data-act="simAgain">다시 재생</button><button class="btn sm" data-act="simNext" id="simNext">다음 지점</button><button class="btn sm primary" data-act="simClose">닫기</button></div>
+  </div>
+</div>
+
+<aside class="console" aria-label="가상 차량 콘솔">
+  <div class="row between"><h2>가상 차량 콘솔</h2><button class="btn sm" data-act="console">닫기</button></div>
+  <p class="note">Pleos Connect Virtual Console의 카드를 본뜬 차량 신호 입력입니다. 웹에서는 차량 신호를 읽을 수 없어 여기서 대신 넣습니다.</p>
+  <div class="row"><button class="btn sm primary" id="btnDemo" data-act="demo">자동 시연 시작</button></div>
+  <div class="grp"><span class="lab">기어 (Gear Selection)</span><span class="seg" id="cGear"></span></div>
+  <div class="grp"><span class="lab">크루즈 상태 (Cruise Control State) <output id="oCruise">OFF</output></span>
+    <div class="row"><button class="btn sm" data-act="cruiseOn">SET / RES</button><button class="btn sm" data-act="cruiseOff">버튼으로 끄기</button><button class="btn sm danger" data-act="forced">강제 해제 경고</button></div>
+    <label for="inTarget">설정 속도 <output id="oTarget">100 km/h</output></label><input id="inTarget" type="range" min="20" max="110" step="1" value="100"></div>
+  <div class="grp"><label for="inBrake">브레이크 페달 <output id="oBrake">0%</output></label><input id="inBrake" type="range" min="0" max="100" step="1" value="0">
+    <div class="row"><button class="btn sm" data-act="brake" data-arg="60">밟기 60%</button><button class="btn sm" data-act="brake" data-arg="90">급제동 90%</button><button class="btn sm" data-act="brake" data-arg="0">떼기</button></div></div>
+  <div class="grp"><label for="inSteer">조향각 (놓으면 0°로 복귀) <output id="oSteer">0°</output></label><input id="inSteer" type="range" min="-540" max="540" step="1" value="0"></div>
+  <div class="grp"><span class="lab">방향지시등</span><span class="seg" id="cSignal"></span>
+    <span class="lab">와이퍼 (켜면 우천으로 인식)</span><span class="seg" id="cWiper"></span>
+    <span class="lab">전조등 (Low beam이면 야간으로 인식)</span><span class="seg" id="cLight"></span></div>
+  <div class="grp"><span class="lab">운전자 음성 (SpeechToText 입력)</span>
+    <div class="row"><button class="btn sm" data-act="say" data-arg="준비">“준비”</button><button class="btn sm" data-act="say" data-arg="네">“네, 추가해 줘”</button><button class="btn sm" data-act="say" data-arg="위험">“여기 위험해”</button></div></div>
+  <div class="grp"><span class="lab">모의 주행 배속</span><span class="seg" id="cScale"></span></div>
+  <div class="grp"><span class="lab">서버 집계 시뮬레이션</span><div class="row"><button class="btn sm" data-act="others">다른 차량 2대의 기록 추가</button></div></div>
+  <div class="grp"><span class="lab">신호·SDK 로그 <output id="oM">0 m</output></span><div class="log" id="log" aria-live="off"></div></div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pad = n => String(n).padStart(2, '0');
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const hhmm = (d = new Date()) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('readymap.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('readymap.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  del(k) { try { localStorage.removeItem('readymap.' + k); } catch (e) { /* ignore */ } },
+};
+if (!window.maplibregl) { document.body.insertAdjacentHTML('afterbegin', '<p class="fatal">지도 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.</p>'); return; }
+
+/* ================= data ================= */
+const TPL = {
+  merge:   { label: '합류 끼어들기', short: '합류 구간', ic: 'M5 20V9M19 20c0-6-4-6-7-9' },
+  diverge: { label: '분기 직전 차선 변경', short: '분기점', ic: 'M7 20V4M7 13c5 0 9-2 10-8' },
+  left:    { label: '교차로 가로지르는 차량', short: '사거리', ic: 'M12 3v18M3 12h18' },
+  tunnel:  { label: '터널 출구 정체', short: '터널 출구', ic: 'M4 20v-7a8 8 0 0 1 16 0v7M9 20v-5h6v5' },
+  curve:   { label: '급커브', short: '급커브 구간', ic: 'M5 20c0-9 5-13 14-13M15 3l4 4-4 4' },
+  school:  { label: '어린이보호구역', short: '어린이보호구역', ic: 'M12 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM8 21l2-6-2-4 4-2 4 2-2 4 2 6' },
+  cam:     { label: '과속 단속', short: '과속 단속 카메라', nosim: true, ic: 'M4 8h3l2-3h6l2 3h3v11H4ZM12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z' },
+};
+// 휴대폰에서는 실제 위치(GPS)로 모든 기능이 동작하고, 데스크탑은 경로 검색·예상 소요시간·시뮬레이션만 보는 미리보기다
+const MOBILE = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const AHEAD = 500;                 // 유의지점 음성 안내 거리(m)
+const EX_KEY = 'test';             // 한국도로공사 고속도로 공공데이터 포털 인증키. 'test'는 포털의 공개 시험용 키이므로 운영 전에 발급받은 키로 교체
+const EX = {"cz":{"0010CZE020":[129.1052,35.2788,129.1004,35.2858],"0010CZE030":[129.1004,35.2858,129.0869,35.2952],"0010CZE035":[129.0869,35.2952,129.0397,35.3386],"0010CZE040":[129.0397,35.3386,129.0485,35.3769],"0010CZE050":[129.0485,35.3769,129.0951,35.5027],"0010CZE060":[129.0951,35.5027,129.1061,35.5156],"0010CZE065":[129.1061,35.5156,129.1243,35.5561],"0010CZE070":[129.1243,35.5561,129.1311,35.5709],"0010CZE080":[129.1311,35.5709,129.1932,35.71],"0010CZE085":[129.1932,35.71,129.1886,35.8098],"0010CZE090":[129.1886,35.8098,129.0829,35.8407],"0010CZE100":[129.0829,35.8407,129.0061,35.9183],"0010CZE105":[129.0061,35.9183,128.9514,35.9253],"0010CZE110":[128.9514,35.9253,128.8949,35.8983],"0010CZE115":[128.8949,35.8983,128.7933,35.875],"0010CZE120":[128.7933,35.875,128.6999,35.8824],"0010CZE130":[128.6999,35.8824,128.6564,35.9112],"0010CZE140":[128.6564,35.9112,128.5841,35.911],"0010CZE150":[128.5841,35.911,128.5244,35.8953],"0010CZE160":[128.5244,35.8953,128.4893,35.9112],"0010CZE165":[128.4893,35.9112,128.4513,35.9532],"0010CZE170":[128.4513,35.9532,128.4291,35.9792],"0010CZE180":[128.4291,35.9792,128.3718,36.0726],"0010CZE190":[128.3718,36.0726,128.3603,36.1135],"0010CZE200":[128.3603,36.1135,128.3045,36.1422],"0010CZE205":[128.3045,36.1422,128.2595,36.1613],"0010CZE210":[128.2595,36.1613,128.1756,36.1399],"0010CZE215":[128.1756,36.1399,128.0941,36.1309],"0010CZE220":[128.0941,36.1309,128.0042,36.1986],"0010CZE230":[128.0042,36.1986,127.902,36.223],"0010CZE240":[127.902,36.223,127.8297,36.2703],"0010CZE250":[127.8297,36.2703,127.6689,36.2787],"0010CZE260":[127.6689,36.2787,127.5681,36.3099],"0010CZE270":[127.5681,36.3099,127.4822,36.3414],"0010CZE280":[127.4822,36.3414,127.4483,36.3613],"0010CZE290":[127.4483,36.3613,127.4184,36.4013],"0010CZE300":[127.4184,36.4013,127.4183,36.4227],"0010CZE305":[127.4183,36.4227,127.4222,36.439],"0010CZE310":[127.4222,36.439,127.4239,36.5344],"0010CZE320":[127.4239,36.5344,127.4315,36.5621],"0010CZE330":[127.4315,36.5621,127.4201,36.6046],"0010CZE340":[127.4201,36.6046,127.3798,36.6252],"0010CZE350":[127.3798,36.6252,127.3706,36.659],"0010CZE355":[127.3706,36.659,127.3396,36.7181],"0010CZE357":[127.3396,36.7181,127.2306,36.768],"0010CZE360":[127.2306,36.768,127.1934,36.7669],"0010CZE370":[127.1934,36.7669,127.1663,36.8261],"0010CZE380":[127.1663,36.8261,127.184,36.8989],"0010CZE385":[127.184,36.8989,127.1504,36.9956],"0010CZE390":[127.1504,36.9956,127.1366,37.0472],"0010CZE400":[127.1366,37.0472,127.1196,37.1078],"0010CZE405":[127.1196,37.1078,127.0801,37.1434],"0010CZE410":[127.0801,37.1434,127.0916,37.1779],"0010CZE420":[127.0916,37.1779,127.0919,37.2175],"0010CZE440":[127.1024,37.2223,127.1024,37.2668],"0010CZE450":[127.1024,37.2668,127.1036,37.2954],"0010CZE460":[127.1036,37.2954,127.1021,37.365],"0010CZE470":[127.1021,37.365,127.1032,37.3964],"0010CZE480":[127.1032,37.3964,127.0969,37.405],"0010CZE490":[127.0969,37.405,127.0935,37.4089],"0010CZS020":[129.1004,35.2858,129.1052,35.2788],"0010CZS030":[129.0869,35.2952,129.1004,35.2858],"0010CZS035":[129.0397,35.3386,129.0869,35.2952],"0010CZS040":[129.0485,35.3769,129.0397,35.3386],"0010CZS050":[129.0951,35.5027,129.0485,35.3769],"0010CZS060":[129.1061,35.5156,129.0951,35.5027],"0010CZS065":[129.1243,35.5561,129.1061,35.5156],"0010CZS070":[129.1311,35.5709,129.1243,35.5561],"0010CZS080":[129.1932,35.71,129.1311,35.5709],"0010CZS085":[129.1886,35.8098,129.1932,35.71],"0010CZS090":[129.0829,35.8407,129.1886,35.8098],"0010CZS100":[129.0061,35.9183,129.0829,35.8407],"0010CZS105":[128.9514,35.9253,129.0061,35.9183],"0010CZS110":[128.8949,35.8983,128.9514,35.9253],"0010CZS115":[128.7933,35.875,128.8949,35.8983],"0010CZS120":[128.6999,35.8824,128.7933,35.875],"0010CZS130":[128.6564,35.9112,128.6999,35.8824],"0010CZS140":[128.5841,35.911,128.6564,35.9112],"0010CZS150":[128.5244,35.8953,128.5841,35.911],"0010CZS160":[128.4893,35.9112,128.5244,35.8953],"0010CZS165":[128.4513,35.9532,128.4893,35.9112],"0010CZS170":[128.4291,35.9792,128.4513,35.9532],"0010CZS180":[128.3718,36.0726,128.4291,35.9792],"0010CZS190":[128.3603,36.1135,128.3718,36.0726],"0010CZS200":[128.3045,36.1422,128.3603,36.1135],"0010CZS205":[128.2595,36.1613,128.3045,36.1422],"0010CZS210":[128.1756,36.1399,128.2595,36.1613],"0010CZS215":[128.0941,36.1309,128.1756,36.1399],"0010CZS220":[128.0042,36.1986,128.0941,36.1309],"0010CZS230":[127.902,36.223,128.0042,36.1986],"0010CZS240":[127.8297,36.2703,127.902,36.223],"0010CZS250":[127.6689,36.2787,127.8297,36.2703],"0010CZS260":[127.5681,36.3099,127.6689,36.2787],"0010CZS270":[127.4822,36.3414,127.5681,36.3099],"0010CZS280":[127.4483,36.3613,127.4822,36.3414],"0010CZS290":[127.4184,36.4013,127.4483,36.3613],"0010CZS300":[127.4183,36.4227,127.4184,36.4013],"0010CZS305":[127.4222,36.439,127.4183,36.4227],"0010CZS310":[127.4239,36.5344,127.4222,36.439],"0010CZS320":[127.4315,36.5621,127.4239,36.5344],"0010CZS330":[127.4201,36.6046,127.4315,36.5621],"0010CZS340":[127.3798,36.6252,127.4201,36.6046],"0010CZS350":[127.3706,36.659,127.3798,36.6252],"0010CZS355":[127.3396,36.7181,127.3706,36.659],"0010CZS357":[127.2306,36.768,127.3396,36.7181],"0010CZS360":[127.1934,36.7669,127.2306,36.768],"0010CZS370":[127.1663,36.8261,127.1934,36.7669],"0010CZS380":[127.184,36.8989,127.1663,36.8261],"0010CZS385":[127.1504,36.9956,127.184,36.8989],"0010CZS390":[127.1366,37.0472,127.1504,36.9956],"0010CZS400":[127.1196,37.1078,127.1366,37.0472],"0010CZS405":[127.0801,37.1434,127.1196,37.1078],"0010CZS410":[127.0916,37.1779,127.0801,37.1434],"0010CZS420":[127.0919,37.2175,127.0916,37.1779],"0010CZS430":[127.1024,37.2223,127.0919,37.2175],"0010CZS440":[127.1024,37.2668,127.1024,37.2223],"0010CZS450":[127.1036,37.2954,127.1024,37.2668],"0010CZS460":[127.1021,37.365,127.1036,37.2954],"0010CZS470":[127.1032,37.3964,127.1021,37.365],"0010CZS480":[127.0969,37.405,127.1032,37.3964],"0010CZS490":[127.0935,37.4089,127.0969,37.405],"0100CZE010":[127.4825,35.0005,127.5175,34.9837],"0100CZE020":[127.5175,34.9837,127.5444,34.9852],"0100CZE025":[127.5444,34.9852,127.5988,34.9699],"0100CZE030":[127.5988,34.9699,127.659,34.9596],"0100CZE040":[127.659,34.9596,127.7124,34.9816],"0100CZE050":[127.7124,34.9816,127.7452,34.9759],"0100CZE060":[127.7452,34.9759,127.8127,34.9991],"0100CZE070":[127.8127,34.9991,127.9043,35.0388],"0100CZE080":[127.9043,35.0388,127.9631,35.0546],"0100CZE090":[127.9631,35.0546,128.0412,35.0888],"0100CZE100":[128.0412,35.0888,128.089,35.1135],"0100CZE110":[128.089,35.1135,128.097,35.1311],"0100CZE120":[128.097,35.1311,128.1221,35.1589],"0100CZE130":[128.1221,35.1589,128.1582,35.1747],"0100CZE140":[128.1582,35.1747,128.2248,35.189],"0100CZE150":[128.2248,35.189,128.2673,35.2282],"0100CZE160":[128.2673,35.2282,128.3201,35.2835],"0100CZE170":[128.3201,35.2835,128.3409,35.2942],"0100CZE180":[128.3409,35.2942,128.393,35.2916],"0100CZE190":[128.393,35.2916,128.472,35.2714],"0100CZE200":[128.472,35.2714,128.5152,35.2835],"0100CZE205":[128.5152,35.2835,128.5463,35.2867],"0100CZE210":[128.5463,35.2867,128.5775,35.2899],"0100CZE215":[128.5775,35.2899,128.6086,35.2931],"0100CZE220":[128.6086,35.2931,128.6477,35.275],"0100CZE230":[128.6477,35.275,128.7023,35.2835],"0100CZE240":[128.7023,35.2835,128.7053,35.279],"0100CZE245":[128.7053,35.279,128.7591,35.2672],"0100CZE250":[128.7591,35.2672,128.7685,35.231],"0100CZE255":[128.7685,35.231,128.7959,35.2181],"0100CZE260":[128.7959,35.2181,128.8441,35.2172],"0100CZE270":[128.8441,35.2172,128.8997,35.224],"0100CZE280":[128.8997,35.224,128.9141,35.2245],"0100CZE282":[128.9141,35.2245,128.9414,35.2221],"0100CZS010":[127.5175,34.9837,127.4825,35.0005],"0100CZS020":[127.5444,34.9852,127.5175,34.9837],"0100CZS025":[127.5988,34.9699,127.5444,34.9852],"0100CZS030":[127.659,34.9596,127.5988,34.9699],"0100CZS040":[127.7124,34.9816,127.659,34.9596],"0100CZS050":[127.7452,34.9759,127.7124,34.9816],"0100CZS060":[127.8127,34.9991,127.7452,34.9759],"0100CZS070":[127.9043,35.0388,127.8127,34.9991],"0100CZS080":[127.9631,35.0546,127.9043,35.0388],"0100CZS090":[128.0412,35.0888,127.9631,35.0546],"0100CZS100":[128.089,35.1135,128.0412,35.0888],"0100CZS110":[128.097,35.1311,128.089,35.1135],"0100CZS120":[128.1221,35.1589,128.097,35.1311],"0100CZS130":[128.1582,35.1747,128.1221,35.1589],"0100CZS140":[128.2248,35.189,128.1582,35.1747],"0100CZS150":[128.2673,35.2282,128.2248,35.189],"0100CZS160":[128.3201,35.2835,128.2673,35.2282],"0100CZS170":[128.3409,35.2942,128.3201,35.2835],"0100CZS180":[128.393,35.2916,128.3409,35.2942],"0100CZS190":[128.472,35.2714,128.393,35.2916],"0100CZS200":[128.5152,35.2835,128.472,35.2714],"0100CZS210":[128.5775,35.2899,128.5463,35.2867],"0100CZS215":[128.6086,35.2931,128.5775,35.2899],"0100CZS220":[128.6477,35.275,128.6086,35.2931],"0100CZS230":[128.7023,35.2835,128.6477,35.275],"0100CZS240":[128.7053,35.279,128.7023,35.2835],"0100CZS245":[128.7591,35.2672,128.7053,35.279],"0100CZS250":[128.7685,35.231,128.7591,35.2672],"0100CZS255":[128.7959,35.2181,128.7685,35.231],"0100CZS260":[128.8441,35.2172,128.7959,35.2181],"0100CZS270":[128.8997,35.224,128.8441,35.2172],"0100CZS280":[128.9141,35.2245,128.8997,35.224],"0100CZS282":[128.9414,35.2221,128.9141,35.2245],"0101CZE040":[126.5689,34.7373,126.7366,34.7201],"0101CZE050":[126.7366,34.7201,126.9043,34.7028],"0101CZE060":[126.9043,34.7028,127.1028,34.8121],"0101CZE070":[127.1028,34.8121,127.3006,34.8373],"0101CZE080":[127.3006,34.8373,127.3436,34.8259],"0101CZE090":[127.3436,34.8259,127.4525,34.8836],"0101CZE100":[127.4525,34.8836,127.4854,34.8984],"0101CZS040":[126.7366,34.7201,126.5689,34.7373],"0101CZS050":[126.9043,34.7028,126.7366,34.7201],"0101CZS060":[127.1028,34.8121,126.9043,34.7028],"0101CZS070":[127.3006,34.8373,127.1028,34.8121],"0101CZS080":[127.3436,34.8259,127.3006,34.8373],"0101CZS090":[127.4525,34.8836,127.3436,34.8259],"0101CZS100":[127.4854,34.8984,127.4525,34.8836],"0120CZE090":[126.9635,35.2239,126.9711,35.2544],"0120CZE100":[126.9711,35.2544,126.9787,35.2848],"0120CZE110":[126.9787,35.2848,127.1365,35.3672],"0120CZE120":[127.1365,35.3672,127.3095,35.399],"0120CZE125":[127.3095,35.399,127.3988,35.4273],"0120CZE130":[127.3988,35.4273,127.4793,35.4795],"0120CZE140":[127.4793,35.4795,127.5903,35.4828],"0120CZE150":[127.5903,35.4828,127.713,35.5421],"0120CZE155":[127.713,35.5421,127.751,35.5294],"0120CZE160":[127.751,35.5294,127.7749,35.5374],"0120CZE170":[127.7749,35.5374,127.8519,35.6084],"0120CZE175":[127.8519,35.6084,127.9288,35.6794],"0120CZE180":[127.9288,35.6794,128.0233,35.7044],"0120CZE190":[128.0233,35.7044,128.1743,35.7119],"0120CZE200":[128.1743,35.7119,128.2536,35.6973],"0120CZE210":[128.2536,35.6973,128.365,35.7531],"0120CZE220":[128.365,35.7531,128.3773,35.759],"0120CZS090":[126.9711,35.2544,126.9635,35.2239],"0120CZS100":[126.9787,35.2848,126.9711,35.2544],"0120CZS110":[127.1365,35.3672,126.9787,35.2848],"0120CZS120":[127.3095,35.399,127.1365,35.3672],"0120CZS125":[127.3988,35.4273,127.3095,35.399],"0120CZS130":[127.4793,35.4795,127.3988,35.4273],"0120CZS140":[127.5903,35.4828,127.4793,35.4795],"0120CZS150":[127.713,35.5421,127.5903,35.4828],"0120CZS155":[127.751,35.5294,127.713,35.5421],"0120CZS160":[127.7749,35.5374,127.751,35.5294],"0120CZS170":[127.8519,35.6084,127.7749,35.5374],"0120CZS175":[127.9288,35.6794,127.8519,35.6084],"0120CZS180":[128.0233,35.7044,127.9288,35.6794],"0120CZS190":[128.1743,35.7119,128.0233,35.7044],"0120CZS200":[128.2536,35.6973,128.1743,35.7119],"0120CZS210":[128.365,35.7531,128.2536,35.6973],"0120CZS220":[128.3773,35.759,128.365,35.7531],"0121CZE010":[126.4351,35.0151,126.4401,35.0161],"0121CZE020":[126.4401,35.0161,126.4864,35.0295],"0121CZE030":[126.4864,35.0295,126.5429,35.055],"0121CZE040":[126.5429,35.055,126.5979,35.0649],"0121CZE050":[126.5979,35.0649,126.693,35.1022],"0121CZE060":[126.693,35.1022,126.7357,35.1141],"0121CZE070":[126.7357,35.1141,126.7539,35.1436],"0121CZS010":[126.4401,35.0161,126.4351,35.0151],"0121CZS020":[126.4864,35.0295,126.4401,35.0161],"0121CZS030":[126.5429,35.055,126.4864,35.0295],"0121CZS040":[126.5979,35.0649,126.5429,35.055],"0121CZS050":[126.693,35.1022,126.5979,35.0649],"0121CZS060":[126.7357,35.1141,126.693,35.1022],"0121CZS070":[126.7539,35.1436,126.7357,35.1141],"0140CZE010":[126.6504,35.4141,126.6768,35.404],"0140CZE020":[126.6768,35.404,126.7592,35.3444],"0140CZE030":[126.7592,35.3444,126.8029,35.328],"0140CZE040":[126.8029,35.328,126.8934,35.2565],"0140CZE050":[126.8934,35.2565,126.9711,35.2544],"0140CZE060":[126.9711,35.2544,127.0392,35.2467],"0140CZS010":[126.6768,35.404,126.6504,35.4141],"0140CZS020":[126.7592,35.3444,126.6768,35.404],"0140CZS030":[126.8029,35.328,126.7592,35.3444],"0140CZS040":[126.8934,35.2565,126.8029,35.328],"0140CZS050":[126.9711,35.2544,126.8934,35.2565],"0140CZS060":[127.0392,35.2467,126.9711,35.2544],"0141CZE180":[128.5062,35.457,128.6772,35.4949],"0141CZE190":[128.6772,35.4949,128.7946,35.5152],"0141CZE200":[128.7946,35.5152,129.0069,35.5237],"0141CZE210":[129.0069,35.5237,129.1061,35.5156],"0141CZE220":[129.1061,35.5156,129.2545,35.5016],"0141CZS180":[128.6772,35.4949,128.5062,35.457],"0141CZS190":[128.7946,35.5152,128.6772,35.4949],"0141CZS200":[129.0069,35.5237,128.7946,35.5152],"0141CZS210":[129.1061,35.5156,129.0069,35.5237],"0150CZE010":[126.4854,34.8633,126.4808,34.8588],"0150CZE020":[126.4808,34.8588,126.4854,34.8633],"0150CZE030":[126.4854,34.8633,126.4977,35.0081],"0150CZE040":[126.4977,35.0081,126.4864,35.0295],"0150CZE050":[126.4864,35.0295,126.4861,35.097],"0150CZE055":[126.4861,35.097,126.5093,35.2419],"0150CZE060":[126.5093,35.2419,126.5545,35.3035],"0150CZE070":[126.5545,35.3035,126.6504,35.4141],"0150CZE080":[126.6504,35.4141,126.671,35.4374],"0150CZE090":[126.671,35.4374,126.6887,35.5109],"0150CZE100":[126.6887,35.5109,126.7023,35.5985],"0150CZE110":[126.7023,35.5985,126.7735,35.727],"0150CZE120":[126.7735,35.727,126.8421,35.8315],"0150CZE130":[126.8421,35.8315,126.8428,35.8529],"0150CZE135":[126.8428,35.8529,126.8294,35.9452],"0150CZE140":[126.8294,35.9452,126.7908,36.0025],"0150CZE150":[126.7908,36.0025,126.7708,36.0603],"0150CZE160":[126.7708,36.0603,126.689,36.0956],"0150CZE170":[126.689,36.0956,126.6055,36.1681],"0150CZE180":[126.6055,36.1681,126.5653,36.241],"0150CZE190":[126.5653,36.241,126.5705,36.332],"0150CZE200":[126.5705,36.332,126.5933,36.4985],"0150CZE210":[126.5933,36.4985,126.562,36.5957],"0150CZE220":[126.562,36.5957,126.5567,36.7086],"0150CZE230":[126.5567,36.7086,126.5697,36.8099],"0150CZE240":[126.5697,36.8099,126.6143,36.8483],"0150CZE250":[126.6143,36.8483,126.7024,36.8956],"0150CZE260":[126.7024,36.8956,126.7859,36.9341],"0150CZE265":[126.7859,36.9341,126.8271,36.9498],"0150CZE267":[126.8271,36.9498,126.8682,36.9655],"0150CZE270":[126.8682,36.9655,126.8639,36.9941],"0150CZE280":[126.8639,36.9941,126.883,37.0556],"0150CZE290":[126.883,37.0556,126.8868,37.1213],"0150CZE300":[126.8868,37.1213,126.8723,37.1913],"0150CZE305":[126.8723,37.1913,126.8866,37.2447],"0150CZE310":[126.8866,37.2447,126.8907,37.2818],"0150CZE315":[126.8907,37.2818,126.8777,37.3113],"0150CZE320":[126.8777,37.3113,126.8647,37.3409],"0150CZE340":[126.8647,37.3554,126.8687,37.3689],"0150CZS010":[126.4808,34.8588,126.4854,34.8633],"0150CZS020":[126.4854,34.8633,126.4808,34.8588],"0150CZS030":[126.4977,35.0081,126.4854,34.8633],"0150CZS040":[126.4864,35.0295,126.4977,35.0081],"0150CZS050":[126.4861,35.097,126.4864,35.0295],"0150CZS055":[126.5093,35.2419,126.4861,35.097],"0150CZS060":[126.5545,35.3035,126.5093,35.2419],"0150CZS070":[126.6504,35.4141,126.5545,35.3035],"0150CZS080":[126.671,35.4374,126.6504,35.4141],"0150CZS090":[126.6887,35.5109,126.671,35.4374],"0150CZS100":[126.7023,35.5985,126.6887,35.5109],"0150CZS110":[126.7735,35.727,126.7023,35.5985],"0150CZS120":[126.8421,35.8315,126.7735,35.727],"0150CZS130":[126.8428,35.8529,126.8421,35.8315],"0150CZS135":[126.8294,35.9452,126.8428,35.8529],"0150CZS140":[126.7908,36.0025,126.8294,35.9452],"0150CZS150":[126.7708,36.0603,126.7908,36.0025],"0150CZS160":[126.689,36.0956,126.7708,36.0603],"0150CZS170":[126.6055,36.1681,126.689,36.0956],"0150CZS180":[126.5653,36.241,126.6055,36.1681],"0150CZS190":[126.5705,36.332,126.5653,36.241],"0150CZS200":[126.5933,36.4985,126.5705,36.332],"0150CZS210":[126.562,36.5957,126.5933,36.4985],"0150CZS220":[126.5567,36.7086,126.562,36.5957],"0150CZS230":[126.5697,36.8099,126.5567,36.7086],"0150CZS240":[126.6143,36.8483,126.5697,36.8099],"0150CZS250":[126.7024,36.8956,126.6143,36.8483],"0150CZS260":[126.7859,36.9341,126.7024,36.8956],"0150CZS265":[126.8271,36.9498,126.7859,36.9341],"0150CZS267":[126.8682,36.9655,126.8271,36.9498],"0150CZS270":[126.8639,36.9941,126.8682,36.9655],"0150CZS280":[126.883,37.0556,126.8639,36.9941],"0150CZS290":[126.8868,37.1213,126.883,37.0556],"0150CZS300":[126.8723,37.1913,126.8868,37.1213],"0150CZS305":[126.8866,37.2447,126.8723,37.1913],"0150CZS310":[126.8907,37.2818,126.8866,37.2447],"0150CZS315":[126.8777,37.3113,126.8907,37.2818],"0150CZS320":[126.8647,37.3409,126.8777,37.3113],"0150CZS340":[126.8687,37.3689,126.8647,37.3554],"0170CZE020":[126.9845,37.0346,126.988,37.0505],"0170CZE030":[126.988,37.0505,126.9915,37.0663],"0170CZE040":[126.9915,37.0663,126.9953,37.1266],"0170CZE050":[126.9953,37.1266,127.0025,37.1744],"0170CZE060":[127.0025,37.1744,126.9733,37.1868],"0170CZE070":[126.9733,37.1868,126.9668,37.191],"0170CZE075":[126.9668,37.191,126.9664,37.2091],"0170CZS020":[126.988,37.0505,126.9845,37.0346],"0170CZS030":[126.9915,37.0663,126.988,37.0505],"0170CZS040":[126.9953,37.1266,126.9915,37.0663],"0170CZS050":[127.0025,37.1744,126.9953,37.1266],"0170CZS060":[126.9733,37.1868,127.0025,37.1744],"0170CZS070":[126.9668,37.191,126.9733,37.1868],"0170CZS075":[126.9664,37.2091,126.9668,37.191],"0171CZE010":[127.0025,37.1744,127.0109,37.1887],"0171CZS010":[127.0109,37.1887,127.0025,37.1744],"0175CZE020":[126.827,36.2793,126.8138,36.4077],"0175CZE030":[126.8138,36.4077,126.8006,36.536],"0175CZE040":[126.8006,36.536,126.7874,36.6644],"0175CZS020":[126.8138,36.4077,126.827,36.2793],"0175CZS030":[126.8006,36.536,126.8138,36.4077],"0175CZS040":[126.7874,36.6644,126.8006,36.536],"0200CZE060":[128.6564,35.9112,128.8296,35.9659],"0200CZE070":[128.8296,35.9659,128.8939,36.0234],"0200CZE075":[128.8939,36.0234,128.9226,36.0301],"0200CZE080":[128.9226,36.0301,129.0039,36.0548],"0200CZE085":[129.0039,36.0548,129.2225,36.0675],"0200CZE090":[129.2225,36.0675,129.2983,36.047],"0200CZS060":[128.8296,35.9659,128.6564,35.9112],"0200CZS070":[128.8939,36.0234,128.8296,35.9659],"0200CZS075":[128.9226,36.0301,128.8939,36.0234],"0200CZS080":[129.0039,36.0548,128.9226,36.0301],"0200CZS085":[129.2225,36.0675,129.0039,36.0548],"0200CZS090":[129.2983,36.047,129.2225,36.0675],"0201CZE010":[127.0971,35.9504,127.1521,35.8951],"0201CZE020":[127.1521,35.8951,127.1744,35.8796],"0201CZE025":[127.1744,35.8796,127.2387,35.8593],"0201CZE030":[127.2387,35.8593,127.2551,35.805],"0201CZE035":[127.2551,35.805,127.4386,35.7695],"0201CZE040":[127.4386,35.7695,127.5875,35.713],"0201CZE050":[127.5875,35.713,127.6109,35.7245],"0201CZS010":[127.1521,35.8951,127.0971,35.9504],"0201CZS020":[127.1744,35.8796,127.1521,35.8951],"0201CZS025":[127.2387,35.8593,127.1744,35.8796],"0201CZS030":[127.2551,35.805,127.2387,35.8593],"0201CZS035":[127.4386,35.7695,127.2551,35.805],"0201CZS040":[127.5875,35.713,127.4386,35.7695],"0201CZS050":[127.6109,35.7245,127.5875,35.713],"0202CZE020":[126.8428,35.8529,126.9354,35.8328],"0202CZE030":[126.9354,35.8328,127.0281,35.8128],"0202CZE040":[127.0281,35.8128,127.112,35.8055],"0202CZE050":[127.112,35.8055,127.1959,35.7982],"0202CZE060":[127.1959,35.7982,127.2551,35.805],"0202CZS020":[126.9354,35.8328,126.8428,35.8529],"0202CZS030":[127.0281,35.8128,126.9354,35.8328],"0202CZS040":[127.112,35.8055,127.0281,35.8128],"0202CZS050":[127.1959,35.7982,127.112,35.8055],"0202CZS060":[127.2551,35.805,127.1959,35.7982],"0251CZE010":[127.4825,35.0005,127.3758,35.0157],"0251CZE020":[127.3758,35.0157,127.269,35.0695],"0251CZE030":[127.269,35.0695,127.2495,35.1262],"0251CZE040":[127.2495,35.1262,127.2255,35.2274],"0251CZE050":[127.2255,35.2274,127.1166,35.261],"0251CZE060":[127.1166,35.261,127.0392,35.2467],"0251CZE070":[127.0392,35.2467,127.0027,35.2301],"0251CZE080":[127.0027,35.2301,126.9635,35.2239],"0251CZE090":[126.9635,35.2239,126.9388,35.2084],"0251CZE100":[126.9388,35.2084,126.9323,35.1931],"0251CZE110":[126.9323,35.1931,126.9388,35.2084],"0251CZE120":[126.9388,35.2084,126.913,35.2061],"0251CZE130":[126.913,35.2061,126.8872,35.2037],"0251CZE140":[126.8872,35.2037,126.8614,35.2013],"0251CZE150":[126.8614,35.2013,126.8356,35.199],"0251CZE160":[126.8356,35.199,126.8283,35.2158],"0251CZE170":[126.8283,35.2158,126.8202,35.2393],"0251CZE175":[126.8202,35.2393,126.7974,35.2555],"0251CZE180":[126.7974,35.2555,126.7905,35.2839],"0251CZE200":[126.8029,35.328,126.8009,35.4314],"0251CZE210":[126.8009,35.4314,126.8063,35.507],"0251CZE220":[126.8063,35.507,126.8336,35.5782],"0251CZE230":[126.8336,35.5782,126.9275,35.664],"0251CZE240":[126.9275,35.664,126.9867,35.7386],"0251CZE250":[126.9867,35.7386,127.003,35.7788],"0251CZE260":[127.003,35.7788,127.0281,35.8128],"0251CZE265":[127.0281,35.8128,127.0382,35.8256],"0251CZE270":[127.0382,35.8256,127.0599,35.8774],"0251CZE280":[127.0599,35.8774,127.0813,35.9232],"0251CZE290":[127.0813,35.9232,127.0971,35.9504],"0251CZE300":[127.0971,35.9504,127.1105,35.9895],"0251CZS010":[127.3758,35.0157,127.4825,35.0005],"0251CZS020":[127.269,35.0695,127.3758,35.0157],"0251CZS030":[127.2495,35.1262,127.269,35.0695],"0251CZS040":[127.2255,35.2274,127.2495,35.1262],"0251CZS050":[127.1166,35.261,127.2255,35.2274],"0251CZS060":[127.0392,35.2467,127.1166,35.261],"0251CZS070":[127.0027,35.2301,127.0392,35.2467],"0251CZS080":[126.9635,35.2239,127.0027,35.2301],"0251CZS090":[126.9388,35.2084,126.9635,35.2239],"0251CZS100":[126.9323,35.1931,126.9388,35.2084],"0251CZS110":[126.9388,35.2084,126.9323,35.1931],"0251CZS120":[126.913,35.2061,126.9388,35.2084],"0251CZS130":[126.8872,35.2037,126.913,35.2061],"0251CZS140":[126.8614,35.2013,126.8872,35.2037],"0251CZS150":[126.8356,35.199,126.8614,35.2013],"0251CZS160":[126.8283,35.2158,126.8356,35.199],"0251CZS170":[126.8202,35.2393,126.8283,35.2158],"0251CZS175":[126.7974,35.2555,126.8202,35.2393],"0251CZS180":[126.7905,35.2839,126.7974,35.2555],"0251CZS200":[126.8009,35.4314,126.8029,35.328],"0251CZS210":[126.8063,35.507,126.8009,35.4314],"0251CZS220":[126.8336,35.5782,126.8063,35.507],"0251CZS230":[126.9275,35.664,126.8336,35.5782],"0251CZS240":[126.9867,35.7386,126.9275,35.664],"0251CZS250":[127.003,35.7788,126.9867,35.7386],"0251CZS260":[127.0281,35.8128,127.003,35.7788],"0251CZS265":[127.0382,35.8256,127.0281,35.8128],"0251CZS270":[127.0599,35.8774,127.0382,35.8256],"0251CZS280":[127.0813,35.9232,127.0599,35.8774],"0251CZS290":[127.0971,35.9504,127.0813,35.9232],"0251CZS300":[127.1105,35.9895,127.0971,35.9504],"0252CZE060":[127.0921,36.486,127.1124,36.5422],"0252CZE070":[127.1124,36.5422,127.1327,36.5984],"0252CZE080":[127.1327,36.5984,127.1529,36.6546],"0252CZE085":[127.1529,36.6546,127.1732,36.7107],"0252CZE090":[127.1732,36.7107,127.1934,36.7669],"0252CZS060":[127.1124,36.5422,127.0921,36.486],"0252CZS070":[127.1327,36.5984,127.1124,36.5422],"0252CZS080":[127.1529,36.6546,127.1327,36.5984],"0252CZS085":[127.1732,36.7107,127.1529,36.6546],"0252CZS090":[127.1934,36.7669,127.1732,36.7107],"0270CZE020":[127.5532,34.9602,127.5444,34.9852],"0270CZE030":[127.5444,34.9852,127.4539,35.1511],"0270CZE040":[127.4539,35.1511,127.4194,35.2551],"0270CZE050":[127.4194,35.2551,127.3403,35.3649],"0270CZE060":[127.3403,35.3649,127.3095,35.399],"0270CZE070":[127.3095,35.399,127.3215,35.4367],"0270CZE080":[127.3215,35.4367,127.3245,35.554],"0270CZE090":[127.3245,35.554,127.3108,35.6302],"0270CZE100":[127.3108,35.6302,127.2166,35.7563],"0270CZE110":[127.2166,35.7563,127.1959,35.7982],"0270CZE115":[127.1959,35.7982,127.186,35.8472],"0270CZE120":[127.186,35.8472,127.1744,35.8796],"0270CZS020":[127.5444,34.9852,127.5532,34.9602],"0270CZS030":[127.4539,35.1511,127.5444,34.9852],"0270CZS040":[127.4194,35.2551,127.4539,35.1511],"0270CZS050":[127.3403,35.3649,127.4194,35.2551],"0270CZS060":[127.3095,35.399,127.3403,35.3649],"0270CZS070":[127.3215,35.4367,127.3095,35.399],"0270CZS080":[127.3245,35.554,127.3215,35.4367],"0270CZS090":[127.3108,35.6302,127.3245,35.554],"0270CZS100":[127.2166,35.7563,127.3108,35.6302],"0270CZS110":[127.1959,35.7982,127.2166,35.7563],"0270CZS115":[127.186,35.8472,127.1959,35.7982],"0270CZS120":[127.1744,35.8796,127.186,35.8472],"0290CZE010":[127.2485,36.9767,127.3071,37.018],"0290CZE040":[127.2509,37.2453,127.2329,37.2888],"0290CZE050":[127.2329,37.2888,127.2148,37.3322],"0290CZE060":[127.2148,37.3322,127.2216,37.353],"0290CZE065":[127.2216,37.353,127.2232,37.3613],"0290CZE070":[127.2232,37.3613,127.1936,37.3986],"0290CZE080":[127.1936,37.3986,127.1714,37.5104],"0290CZE090":[127.1714,37.5104,127.1645,37.5328],"0290CZE100":[127.1645,37.5328,127.1534,37.5663],"0290CZS010":[127.3071,37.018,127.3087,36.9756],"0290CZS040":[127.2329,37.2888,127.2509,37.2453],"0290CZS050":[127.2148,37.3322,127.2329,37.2888],"0290CZS060":[127.2216,37.353,127.2148,37.3322],"0290CZS065":[127.2232,37.3613,127.2216,37.353],"0290CZS070":[127.1936,37.3986,127.2232,37.3613],"0290CZS080":[127.1714,37.5104,127.1936,37.3986],"0290CZS090":[127.1645,37.5328,127.1714,37.5104],"0290CZS100":[127.1534,37.5663,127.1645,37.5328],"0300CZE130":[127.4315,36.5621,127.5045,36.5277],"0300CZE140":[127.5045,36.5277,127.6086,36.4815],"0300CZE150":[127.6086,36.4815,127.7227,36.4531],"0300CZE160":[127.7227,36.4531,127.7904,36.4591],"0300CZE170":[127.7904,36.4591,127.8745,36.452],"0300CZE175":[127.8745,36.452,127.9586,36.4449],"0300CZE180":[127.9586,36.4449,128.143,36.3717],"0300CZE190":[128.143,36.3717,128.2394,36.3703],"0300CZE220":[128.2926,36.3776,128.4137,36.4037],"0300CZE230":[128.4137,36.4037,128.6178,36.4266],"0300CZE240":[128.6178,36.4266,128.6782,36.4145],"0300CZE250":[128.6782,36.4145,128.8915,36.4405],"0300CZE260":[128.8915,36.4405,129.0288,36.4528],"0300CZE280":[129.1224,36.4974,129.3452,36.3802],"0300CZE290":[129.3452,36.3802,129.365,36.3814],"0300CZS130":[127.5045,36.5277,127.4315,36.5621],"0300CZS140":[127.6086,36.4815,127.5045,36.5277],"0300CZS150":[127.7227,36.4531,127.6086,36.4815],"0300CZS160":[127.7904,36.4591,127.7227,36.4531],"0300CZS170":[127.8745,36.452,127.7904,36.4591],"0300CZS175":[127.9586,36.4449,127.8745,36.452],"0300CZS180":[128.143,36.3717,127.9586,36.4449],"0300CZS190":[128.2394,36.3703,128.143,36.3717],"0300CZS220":[128.4137,36.4037,128.2926,36.3776],"0300CZS230":[128.6178,36.4266,128.4137,36.4037],"0300CZS240":[128.6782,36.4145,128.6178,36.4266],"0300CZS250":[128.8915,36.4405,128.6782,36.4145],"0300CZS260":[129.0288,36.4528,128.8915,36.4405],"0300CZS280":[129.3452,36.3802,129.1224,36.4974],"0300CZS290":[129.365,36.3814,129.3452,36.3802],"0301CZE010":[126.6143,36.8483,126.6519,36.8231],"0301CZE020":[126.6519,36.8231,126.702,36.7577],"0301CZE030":[126.702,36.7577,126.7755,36.6769],"0301CZE035":[126.7755,36.6769,126.7874,36.6644],"0301CZE040":[126.7874,36.6644,126.8629,36.5902],"0301CZE050":[126.8629,36.5902,126.9708,36.5655],"0301CZE060":[126.9708,36.5655,127.0261,36.4968],"0301CZE070":[127.0261,36.4968,127.0593,36.4849],"0301CZE080":[127.0593,36.4849,127.0921,36.486],"0301CZE090":[127.0921,36.486,127.1279,36.4853],"0301CZE100":[127.1279,36.4853,127.1906,36.4928],"0301CZE110":[127.1906,36.4928,127.2956,36.4228],"0301CZE120":[127.2956,36.4228,127.3442,36.3941],"0301CZS010":[126.6519,36.8231,126.6143,36.8483],"0301CZS020":[126.702,36.7577,126.6519,36.8231],"0301CZS030":[126.7755,36.6769,126.702,36.7577],"0301CZS035":[126.7874,36.6644,126.7755,36.6769],"0301CZS040":[126.8629,36.5902,126.7874,36.6644],"0301CZS050":[126.9708,36.5655,126.8629,36.5902],"0301CZS060":[127.0261,36.4968,126.9708,36.5655],"0301CZS070":[127.0593,36.4849,127.0261,36.4968],"0301CZS080":[127.0921,36.486,127.0593,36.4849],"0301CZS090":[127.1279,36.4853,127.0921,36.486],"0301CZS100":[127.1906,36.4928,127.1279,36.4853],"0301CZS110":[127.2956,36.4228,127.1906,36.4928],"0301CZS120":[127.3442,36.3941,127.2956,36.4228],"0320CZE010":[127.3396,36.7181,127.4044,36.7319],"0320CZE020":[127.4044,36.7319,127.4692,36.7458],"0320CZS010":[127.4044,36.7319,127.3396,36.7181],"0320CZS020":[127.4692,36.7458,127.4044,36.7319],"0321CZE010":[126.9727,36.8217,127.043,36.7871],"0321CZE020":[127.043,36.7871,127.1373,36.7613],"0321CZE030":[127.1373,36.7613,127.1934,36.7669],"0321CZS010":[127.043,36.7871,126.9727,36.8217],"0321CZS020":[127.1373,36.7613,127.043,36.7871],"0321CZS030":[127.1934,36.7669,127.1373,36.7613],"0351CZE010":[128.4331,34.8694,128.4067,34.8944],"0351CZE020":[128.4067,34.8944,128.3805,34.9687],"0351CZE030":[128.3805,34.9687,128.3457,35.0069],"0351CZE040":[128.3457,35.0069,128.1936,35.0884],"0351CZE050":[128.1936,35.0884,128.097,35.1311],"0351CZE060":[128.097,35.1311,128.0453,35.1853],"0351CZE070":[128.0453,35.1853,127.9545,35.293],"0351CZE080":[127.9545,35.293,127.8646,35.4242],"0351CZE090":[127.8646,35.4242,127.8294,35.485],"0351CZE100":[127.8294,35.485,127.7749,35.5374],"0351CZE110":[127.7749,35.5374,127.7684,35.5902],"0351CZE130":[127.6797,35.6662,127.6109,35.7245],"0351CZE140":[127.6109,35.7245,127.649,35.8425],"0351CZE150":[127.649,35.8425,127.6522,35.9761],"0351CZE160":[127.6522,35.9761,127.5255,36.105],"0351CZE170":[127.5255,36.105,127.481,36.1967],"0351CZE180":[127.481,36.1967,127.4762,36.2685],"0351CZE190":[127.4762,36.2685,127.4567,36.2873],"0351CZE200":[127.4567,36.2873,127.468,36.3182],"0351CZE210":[127.468,36.3182,127.4822,36.3414],"0351CZS010":[128.4067,34.8944,128.4331,34.8694],"0351CZS020":[128.3805,34.9687,128.4067,34.8944],"0351CZS030":[128.3457,35.0069,128.3805,34.9687],"0351CZS040":[128.1936,35.0884,128.3457,35.0069],"0351CZS050":[128.097,35.1311,128.1936,35.0884],"0351CZS060":[128.0453,35.1853,128.097,35.1311],"0351CZS070":[127.9545,35.293,128.0453,35.1853],"0351CZS080":[127.8646,35.4242,127.9545,35.293],"0351CZS090":[127.8294,35.485,127.8646,35.4242],"0351CZS100":[127.7749,35.5374,127.8294,35.485],"0351CZS110":[127.7684,35.5902,127.7749,35.5374],"0351CZS130":[127.6109,35.7245,127.6797,35.6662],"0351CZS140":[127.649,35.8425,127.6109,35.7245],"0351CZS150":[127.6522,35.9761,127.649,35.8425],"0351CZS160":[127.5255,36.105,127.6522,35.9761],"0351CZS170":[127.481,36.1967,127.5255,36.105],"0351CZS180":[127.4762,36.2685,127.481,36.1967],"0351CZS190":[127.4567,36.2873,127.4762,36.2685],"0351CZS200":[127.468,36.3182,127.4567,36.2873],"0351CZS210":[127.4822,36.3414,127.468,36.3182],"0352CZE280":[127.4201,36.6046,127.4189,36.6262],"0352CZE285":[127.4189,36.6262,127.4178,36.6477],"0352CZE290":[127.4178,36.6477,127.4443,36.7103],"0352CZE300":[127.4443,36.7103,127.4692,36.7458],"0352CZE305":[127.4692,36.7458,127.5038,36.7694],"0352CZE310":[127.5038,36.7694,127.4693,36.8704],"0352CZE320":[127.4693,36.8704,127.4747,36.9338],"0352CZE330":[127.4747,36.9338,127.4665,36.9814],"0352CZE340":[127.4665,36.9814,127.4414,37.1856],"0352CZE345":[127.4414,37.1856,127.4509,37.0877],"0352CZE350":[127.4509,37.0877,127.443,37.1816],"0352CZE355":[127.443,37.1816,127.4257,37.2368],"0352CZE360":[127.4257,37.2368,127.4122,37.2572],"0352CZE370":[127.4122,37.2572,127.3968,37.2788],"0352CZE380":[127.3968,37.2788,127.3885,37.3232],"0352CZE383":[127.3885,37.3232,127.3513,37.3123],"0352CZE384":[127.3513,37.3123,127.3221,37.3552],"0352CZE385":[127.3221,37.3552,127.3155,37.3858],"0352CZE390":[127.3155,37.3858,127.2662,37.446],"0352CZE400":[127.2662,37.446,127.2459,37.4774],"0352CZE410":[127.2459,37.4774,127.2199,37.5168],"0352CZE420":[127.2199,37.5168,127.219,37.5292],"0352CZE430":[127.219,37.5292,127.195,37.5278],"0352CZS280":[127.4189,36.6262,127.4201,36.6046],"0352CZS285":[127.4178,36.6477,127.4189,36.6262],"0352CZS290":[127.4443,36.7103,127.4178,36.6477],"0352CZS300":[127.4692,36.7458,127.4443,36.7103],"0352CZS305":[127.5038,36.7694,127.4692,36.7458],"0352CZS310":[127.4693,36.8704,127.5038,36.7694],"0352CZS320":[127.4747,36.9338,127.4693,36.8704],"0352CZS330":[127.4665,36.9814,127.4747,36.9338],"0352CZS340":[127.4414,37.1856,127.4665,36.9814],"0352CZS345":[127.4509,37.0877,127.4414,37.1856],"0352CZS350":[127.443,37.1816,127.4509,37.0877],"0352CZS355":[127.4257,37.2368,127.443,37.1816],"0352CZS360":[127.4122,37.2572,127.4257,37.2368],"0352CZS370":[127.3968,37.2788,127.4122,37.2572],"0352CZS380":[127.3513,37.3123,127.3968,37.2788],"0352CZS383":[127.3221,37.3552,127.3513,37.3123],"0352CZS385":[127.3155,37.3858,127.3221,37.3552],"0352CZS390":[127.2662,37.446,127.3155,37.3858],"0352CZS400":[127.2459,37.4774,127.2662,37.446],"0352CZS410":[127.2199,37.5168,127.2459,37.4774],"0352CZS420":[127.219,37.5292,127.2199,37.5168],"0352CZS430":[127.195,37.5278,127.219,37.5292],"0370CZE010":[127.4122,37.2572,127.3968,37.2788],"0370CZE020":[127.3968,37.2788,127.3885,37.3232],"0370CZE023":[127.3885,37.3232,127.3221,37.3552],"0370CZE025":[127.3221,37.3552,127.3155,37.3858],"0370CZE030":[127.3155,37.3858,127.2923,37.4163],"0370CZE040":[127.2923,37.4163,127.2691,37.4469],"0370CZE050":[127.2691,37.4469,127.2459,37.4774],"0370CZS010":[127.3968,37.2788,127.4122,37.2572],"0370CZS020":[127.3221,37.3552,127.3968,37.2788],"0370CZS025":[127.3155,37.3858,127.3221,37.3552],"0370CZS030":[127.2923,37.4163,127.3155,37.3858],"0370CZS040":[127.2691,37.4469,127.2923,37.4163],"0370CZS050":[127.2459,37.4774,127.2691,37.4469],"0400CZE010":[126.883,37.0556,126.9253,37.0508],"0400CZE020":[126.9253,37.0508,126.9845,37.0346],"0400CZE030":[126.9845,37.0346,127.0361,37.0229],"0400CZE035":[127.0361,37.0229,127.108,37.039],"0400CZE040":[127.108,37.039,127.1366,37.0472],"0400CZE050":[127.1366,37.0472,127.1579,37.0381],"0400CZE060":[127.1579,37.0381,127.2485,36.9767],"0400CZE070":[127.2485,36.9767,127.3087,36.9756],"0400CZE075":[127.3087,36.9756,127.4499,36.9405],"0400CZE080":[127.4499,36.9405,127.4747,36.9338],"0400CZE090":[127.4747,36.9338,127.547,36.9541],"0400CZE095":[127.547,36.9541,127.6199,36.9858],"0400CZE100":[127.6199,36.9858,127.6733,37.0067],"0400CZE110":[127.6733,37.0067,127.7475,37.0393],"0400CZE120":[127.7475,37.0393,127.8094,37.0376],"0400CZE130":[127.8094,37.0376,127.926,37.0656],"0400CZE140":[127.926,37.0656,128.1699,37.0789],"0400CZS010":[126.9253,37.0508,126.883,37.0556],"0400CZS020":[126.9845,37.0346,126.9253,37.0508],"0400CZS030":[127.0361,37.0229,126.9845,37.0346],"0400CZS035":[127.108,37.039,127.0361,37.0229],"0400CZS040":[127.1366,37.0472,127.108,37.039],"0400CZS050":[127.1579,37.0381,127.1366,37.0472],"0400CZS060":[127.2485,36.9767,127.1579,37.0381],"0400CZS070":[127.3087,36.9756,127.2485,36.9767],"0400CZS075":[127.4499,36.9405,127.3087,36.9756],"0400CZS080":[127.4747,36.9338,127.4499,36.9405],"0400CZS090":[127.547,36.9541,127.4747,36.9338],"0400CZS095":[127.6199,36.9858,127.547,36.9541],"0400CZS100":[127.6733,37.0067,127.6199,36.9858],"0400CZS110":[127.7475,37.0393,127.6733,37.0067],"0400CZS120":[127.8094,37.0376,127.7475,37.0393],"0400CZS130":[127.926,37.0656,127.8094,37.0376],"0400CZS140":[128.1699,37.0789,127.926,37.0656],"0450CZE020":[128.5152,35.2835,128.5091,35.3232],"0450CZE030":[128.5091,35.3232,128.4872,35.3975],"0450CZE040":[128.4872,35.3975,128.5102,35.4515],"0450CZE050":[128.5102,35.4515,128.5062,35.457],"0450CZE055":[128.5062,35.457,128.4785,35.5406],"0450CZE060":[128.4785,35.5406,128.4356,35.6682],"0450CZE070":[128.4356,35.6682,128.3773,35.759],"0450CZE080":[128.3773,35.759,128.3274,35.839],"0450CZE090":[128.3274,35.839,128.249,35.916],"0450CZE100":[128.249,35.916,128.2707,36.0614],"0450CZE110":[128.2707,36.0614,128.2595,36.1613],"0450CZE120":[128.2595,36.1613,128.2691,36.2374],"0450CZE130":[128.2691,36.2374,128.2394,36.3703],"0450CZE140":[128.2394,36.3703,128.2065,36.4221],"0450CZE150":[128.2065,36.4221,128.1653,36.5297],"0450CZE160":[128.1653,36.5297,128.1625,36.587],"0450CZE170":[128.1625,36.587,128.1142,36.7047],"0450CZE180":[128.1142,36.7047,127.9854,36.7602],"0450CZE190":[127.9854,36.7602,127.9246,36.8635],"0450CZE200":[127.9246,36.8635,127.8398,36.9731],"0450CZE210":[127.8398,36.9731,127.8403,37.0218],"0450CZE215":[127.8403,37.0218,127.8094,37.0376],"0450CZE217":[127.8094,37.0376,127.7966,37.0391],"0450CZE220":[127.7966,37.0391,127.7475,37.0393],"0450CZE225":[127.7475,37.0393,127.6655,37.1207],"0450CZE230":[127.6655,37.1207,127.5928,37.2249],"0450CZE240":[127.5928,37.2249,127.5928,37.2509],"0450CZE245":[127.5928,37.2509,127.5859,37.3019],"0450CZE250":[127.5859,37.3019,127.5219,37.3736],"0450CZE260":[127.5219,37.3736,127.472,37.484],"0450CZE270":[127.472,37.484,127.4402,37.5178],"0450CZS020":[128.5091,35.3232,128.5152,35.2835],"0450CZS030":[128.4872,35.3975,128.5091,35.3232],"0450CZS040":[128.5102,35.4515,128.4872,35.3975],"0450CZS050":[128.5062,35.457,128.5102,35.4515],"0450CZS055":[128.4785,35.5406,128.5062,35.457],"0450CZS060":[128.4356,35.6682,128.4785,35.5406],"0450CZS070":[128.3773,35.759,128.4356,35.6682],"0450CZS080":[128.3274,35.839,128.3773,35.759],"0450CZS090":[128.249,35.916,128.3274,35.839],"0450CZS100":[128.2707,36.0614,128.249,35.916],"0450CZS110":[128.2595,36.1613,128.2707,36.0614],"0450CZS120":[128.2691,36.2374,128.2595,36.1613],"0450CZS130":[128.2394,36.3703,128.2691,36.2374],"0450CZS140":[128.2065,36.4221,128.2394,36.3703],"0450CZS150":[128.1653,36.5297,128.2065,36.4221],"0450CZS160":[128.1625,36.587,128.1653,36.5297],"0450CZS170":[128.1142,36.7047,128.1625,36.587],"0450CZS180":[127.9854,36.7602,128.1142,36.7047],"0450CZS190":[127.9246,36.8635,127.9854,36.7602],"0450CZS200":[127.8398,36.9731,127.9246,36.8635],"0450CZS210":[127.8403,37.0218,127.8398,36.9731],"0450CZS215":[127.8094,37.0376,127.8403,37.0218],"0450CZS220":[127.7475,37.0393,127.7966,37.0391],"0450CZS225":[127.6655,37.1207,127.7475,37.0393],"0450CZS230":[127.5928,37.2249,127.6655,37.1207],"0450CZS240":[127.5928,37.2509,127.5928,37.2249],"0450CZS245":[127.5859,37.3019,127.5928,37.2509],"0450CZS250":[127.5219,37.3736,127.5859,37.3019],"0450CZS260":[127.472,37.484,127.5219,37.3736],"0450CZS270":[127.4402,37.5178,127.472,37.484],"0500CZE030":[126.7809,37.3584,126.7924,37.345],"0500CZE040":[126.7924,37.345,126.8425,37.3498],"0500CZE050":[126.8425,37.3498,126.8647,37.3409],"0500CZE060":[126.8647,37.3409,126.9105,37.3231],"0500CZE065":[126.9105,37.3231,126.9199,37.3219],"0500CZE070":[126.9199,37.3219,126.9395,37.3291],"0500CZE080":[126.9395,37.3291,126.9589,37.3262],"0500CZE090":[126.9589,37.3262,126.9874,37.3259],"0500CZE100":[126.9874,37.3259,127.047,37.2981],"0500CZE110":[127.047,37.2981,127.1036,37.2954],"0500CZE120":[127.1036,37.2954,127.1777,37.2848],"0500CZE130":[127.1777,37.2848,127.1876,37.2695],"0500CZE135":[127.1876,37.2695,127.2113,37.2593],"0500CZE140":[127.2113,37.2593,127.2509,37.2453],"0500CZE145":[127.2509,37.2453,127.2957,37.2363],"0500CZE150":[127.2957,37.2363,127.3657,37.2394],"0500CZE160":[127.3657,37.2394,127.4257,37.2368],"0500CZE170":[127.4257,37.2368,127.495,37.2513],"0500CZE180":[127.495,37.2513,127.5928,37.2249],"0500CZE190":[127.5928,37.2249,127.6498,37.2537],"0500CZE200":[127.6498,37.2537,127.8259,37.3137],"0500CZE210":[127.8259,37.3137,127.9053,37.3609],"0500CZE220":[127.9053,37.3609,127.929,37.3856],"0500CZE225":[127.929,37.3856,127.95,37.3992],"0500CZE230":[127.95,37.3992,128.0708,37.4497],"0500CZE240":[128.0708,37.4497,128.2058,37.497],"0500CZE250":[128.2058,37.497,128.277,37.5234],"0500CZE255":[128.277,37.5234,128.363,37.5612],"0500CZE260":[128.363,37.5612,128.4124,37.5873],"0500CZE270":[128.4124,37.5873,128.4906,37.6357],"0500CZE280":[128.4906,37.6357,128.5616,37.6484],"0500CZE290":[128.5616,37.6484,128.6955,37.6827],"0500CZE300":[128.6955,37.6827,128.8339,37.7797],"0500CZS030":[126.7924,37.345,126.7809,37.3584],"0500CZS040":[126.8425,37.3498,126.7924,37.345],"0500CZS060":[126.9105,37.3231,126.8647,37.3409],"0500CZS065":[126.9199,37.3219,126.9105,37.3231],"0500CZS070":[126.9395,37.3291,126.9199,37.3219],"0500CZS080":[126.9589,37.3262,126.9395,37.3291],"0500CZS090":[126.9874,37.3259,126.9589,37.3262],"0500CZS100":[127.047,37.2981,126.9874,37.3259],"0500CZS110":[127.1036,37.2954,127.047,37.2981],"0500CZS120":[127.1777,37.2848,127.1036,37.2954],"0500CZS130":[127.1876,37.2695,127.1777,37.2848],"0500CZS135":[127.2113,37.2593,127.1876,37.2695],"0500CZS140":[127.2509,37.2453,127.2113,37.2593],"0500CZS145":[127.2957,37.2363,127.2509,37.2453],"0500CZS150":[127.3657,37.2394,127.2957,37.2363],"0500CZS160":[127.4257,37.2368,127.3657,37.2394],"0500CZS170":[127.495,37.2513,127.4257,37.2368],"0500CZS180":[127.5928,37.2249,127.495,37.2513],"0500CZS190":[127.6498,37.2537,127.5928,37.2249],"0500CZS200":[127.8259,37.3137,127.6498,37.2537],"0500CZS210":[127.9053,37.3609,127.8259,37.3137],"0500CZS220":[127.929,37.3856,127.9053,37.3609],"0500CZS225":[127.95,37.3992,127.929,37.3856],"0500CZS230":[128.0708,37.4497,127.95,37.3992],"0500CZS240":[128.2058,37.497,128.0708,37.4497],"0500CZS250":[128.277,37.5234,128.2058,37.497],"0500CZS255":[128.363,37.5612,128.277,37.5234],"0500CZS260":[128.4124,37.5873,128.363,37.5612],"0500CZS270":[128.4906,37.6357,128.4124,37.5873],"0500CZS280":[128.5616,37.6484,128.4906,37.6357],"0500CZS290":[128.6955,37.6827,128.5616,37.6484],"0500CZS300":[128.8339,37.7797,128.6955,37.6827],"0520CZE090":[127.3155,37.3858,127.3877,37.3864],"0520CZE100":[127.3877,37.3864,127.4598,37.3871],"0520CZE110":[127.4598,37.3871,127.532,37.3878],"0520CZE120":[127.532,37.3878,127.6042,37.3884],"0520CZE130":[127.6042,37.3884,127.6763,37.3891],"0520CZE140":[127.6763,37.3891,127.7485,37.3897],"0520CZE150":[127.7485,37.3897,127.8206,37.3904],"0520CZE160":[127.8206,37.3904,127.8928,37.391],"0520CZE170":[127.8928,37.391,127.929,37.3856],"0520CZS090":[127.3877,37.3864,127.3155,37.3858],"0520CZS100":[127.4598,37.3871,127.3877,37.3864],"0520CZS110":[127.532,37.3878,127.4598,37.3871],"0520CZS120":[127.6042,37.3884,127.532,37.3878],"0520CZS130":[127.6763,37.3891,127.6042,37.3884],"0520CZS140":[127.7485,37.3897,127.6763,37.3891],"0520CZS150":[127.8206,37.3904,127.7485,37.3897],"0520CZS160":[127.8928,37.391,127.8206,37.3904],"0520CZS170":[127.929,37.3856,127.8928,37.391],"0550CZE040":[128.9842,35.256,128.984,35.2876],"0550CZE050":[128.984,35.2876,128.9647,35.2665],"0550CZE130":[128.5244,35.8953,128.5393,35.9344],"0550CZE140":[128.5393,35.9344,128.5517,35.9704],"0550CZE145":[128.5517,35.9704,128.5147,36.0484],"0550CZE150":[128.5147,36.0484,128.5356,36.0919],"0550CZE160":[128.5356,36.0919,128.5673,36.1589],"0550CZE165":[128.5673,36.1589,128.5635,36.2003],"0550CZE170":[128.5635,36.2003,128.5776,36.2881],"0550CZE180":[128.5776,36.2881,128.6178,36.4266],"0550CZE185":[128.6178,36.4266,128.6256,36.4762],"0550CZE190":[128.6256,36.4762,128.6214,36.5888],"0550CZE200":[128.6214,36.5888,128.5383,36.6691],"0550CZE210":[128.5383,36.6691,128.5743,36.7718],"0550CZE220":[128.5743,36.7718,128.5285,36.8498],"0550CZE230":[128.5285,36.8498,128.3696,36.9196],"0550CZE240":[128.3696,36.9196,128.2888,37.021],"0550CZE250":[128.2888,37.021,128.1848,37.0746],"0550CZE260":[128.1848,37.0746,128.1699,37.0789],"0550CZE265":[128.1699,37.0789,128.147,37.1336],"0550CZE270":[128.147,37.1336,128.0876,37.2342],"0550CZE280":[128.0876,37.2342,127.9248,37.324],"0550CZE290":[127.9248,37.324,127.9053,37.3609],"0550CZE300":[127.9053,37.3609,127.8928,37.391],"0550CZE305":[127.8928,37.391,127.9237,37.4241],"0550CZE310":[127.9237,37.4241,127.97,37.5015],"0550CZE320":[127.97,37.5015,127.8556,37.6753],"0550CZE330":[127.8556,37.6753,127.7912,37.749],"0550CZE340":[127.7912,37.749,127.7759,37.8398],"0550CZS040":[128.984,35.2876,128.9842,35.256],"0550CZS050":[128.9647,35.2665,128.984,35.2876],"0550CZS130":[128.5393,35.9344,128.5244,35.8953],"0550CZS140":[128.5517,35.9704,128.5393,35.9344],"0550CZS145":[128.5147,36.0484,128.5517,35.9704],"0550CZS150":[128.5356,36.0919,128.5147,36.0484],"0550CZS160":[128.5673,36.1589,128.5356,36.0919],"0550CZS165":[128.5635,36.2003,128.5673,36.1589],"0550CZS170":[128.5776,36.2881,128.5635,36.2003],"0550CZS180":[128.6178,36.4266,128.5776,36.2881],"0550CZS185":[128.6256,36.4762,128.6178,36.4266],"0550CZS190":[128.6214,36.5888,128.6256,36.4762],"0550CZS200":[128.5383,36.6691,128.6214,36.5888],"0550CZS210":[128.5743,36.7718,128.5383,36.6691],"0550CZS220":[128.5285,36.8498,128.5743,36.7718],"0550CZS230":[128.3696,36.9196,128.5285,36.8498],"0550CZS240":[128.2888,37.021,128.3696,36.9196],"0550CZS250":[128.1848,37.0746,128.2888,37.021],"0550CZS260":[128.1699,37.0789,128.1848,37.0746],"0550CZS265":[128.147,37.1336,128.1699,37.0789],"0550CZS270":[128.0876,37.2342,128.147,37.1336],"0550CZS280":[127.9248,37.324,128.0876,37.2342],"0550CZS290":[127.9053,37.3609,127.9248,37.324],"0550CZS300":[127.8928,37.391,127.9053,37.3609],"0550CZS305":[127.9237,37.4241,127.8928,37.391],"0550CZS310":[127.97,37.5015,127.9237,37.4241],"0550CZS320":[127.8556,37.6753,127.97,37.5015],"0550CZS330":[127.7912,37.749,127.8556,37.6753],"0550CZS340":[127.7759,37.8398,127.7912,37.749],"0552CZE090":[128.7946,35.5152,128.7709,35.607],"0552CZE100":[128.7709,35.607,128.7472,35.6988],"0552CZE110":[128.7472,35.6988,128.7236,35.7906],"0552CZE120":[128.7236,35.7906,128.6999,35.8824],"0552CZS090":[128.7709,35.607,128.7946,35.5152],"0552CZS100":[128.7472,35.6988,128.7709,35.607],"0552CZS110":[128.7236,35.7906,128.7472,35.6988],"0552CZS120":[128.6999,35.8824,128.7236,35.7906],"0600CZE040":[127.2109,37.5917,127.2413,37.5967],"0600CZE050":[127.2413,37.5967,127.3116,37.637],"0600CZE060":[127.3116,37.637,127.3263,37.6331],"0600CZE065":[127.3263,37.6331,127.3658,37.6348],"0600CZE070":[127.3658,37.6348,127.4914,37.6695],"0600CZE080":[127.4914,37.6695,127.627,37.7384],"0600CZE090":[127.627,37.7384,127.7266,37.7507],"0600CZE100":[127.7266,37.7507,127.7354,37.7551],"0600CZE110":[127.7354,37.7551,127.782,37.7581],"0600CZE130":[127.7912,37.749,127.9591,37.7625],"0600CZE140":[127.9591,37.7625,128.132,37.7853],"0600CZE150":[128.132,37.7853,128.2897,37.9212],"0600CZE160":[128.2897,37.9212,128.2879,37.9137],"0600CZE165":[128.2879,37.9137,128.5319,37.9906],"0600CZS040":[127.2413,37.5967,127.2109,37.5917],"0600CZS050":[127.3116,37.637,127.2413,37.5967],"0600CZS060":[127.3263,37.6331,127.3116,37.637],"0600CZS065":[127.3658,37.6348,127.3263,37.6331],"0600CZS070":[127.4914,37.6695,127.3658,37.6348],"0600CZS080":[127.627,37.7384,127.4914,37.6695],"0600CZS090":[127.7266,37.7507,127.627,37.7384],"0600CZS100":[127.7354,37.7551,127.7266,37.7507],"0600CZS110":[127.782,37.7581,127.7354,37.7551],"0600CZS130":[127.9591,37.7625,127.7912,37.749],"0600CZS140":[128.132,37.7853,127.9591,37.7625],"0600CZS150":[128.2897,37.9212,128.132,37.7853],"0600CZS160":[128.2879,37.9137,128.2897,37.9212],"0600CZS165":[128.5319,37.9906,128.2879,37.9137],"0650CZE060":[129.2081,37.3931,129.1341,37.4451],"0650CZE070":[129.1341,37.4451,129.0995,37.5125],"0650CZE080":[129.0995,37.5125,129.0962,37.5825],"0650CZE090":[129.0962,37.5825,129.0345,37.6159],"0650CZE100":[129.0345,37.6159,128.8971,37.6967],"0650CZE110":[128.8971,37.6967,128.8468,37.7464],"0650CZE120":[128.8468,37.7464,128.8339,37.7797],"0650CZE130":[128.8339,37.7797,128.8213,37.8359],"0650CZE140":[128.8213,37.8359,128.7964,37.9179],"0650CZE150":[128.7964,37.9179,128.692,38.03],"0650CZE160":[128.692,38.03,128.5975,38.0718],"0650CZE170":[128.5975,38.0718,128.5805,38.1552],"0650CZE180":[128.5805,38.1552,128.5202,38.2029],"0650CZS060":[129.1341,37.4451,129.2081,37.3931],"0650CZS070":[129.0995,37.5125,129.1341,37.4451],"0650CZS080":[129.0962,37.5825,129.0995,37.5125],"0650CZS090":[129.0345,37.6159,129.0962,37.5825],"0650CZS100":[128.8971,37.6967,129.0345,37.6159],"0650CZS110":[128.8468,37.7464,128.8971,37.6967],"0650CZS120":[128.8339,37.7797,128.8468,37.7464],"0650CZS130":[128.8213,37.8359,128.8339,37.7797],"0650CZS140":[128.7964,37.9179,128.8213,37.8359],"0650CZS150":[128.692,38.03,128.7964,37.9179],"0650CZS160":[128.5975,38.0718,128.692,38.03],"0650CZS170":[128.5805,38.1552,128.5975,38.0718],"0650CZS180":[128.5202,38.2029,128.5805,38.1552],"0651CZE015":[129.2057,35.1998,129.2085,35.2218],"0651CZE020":[129.2085,35.2218,129.2275,35.284],"0651CZE030":[129.2275,35.284,129.2416,35.3285],"0651CZE040":[129.2416,35.3285,129.262,35.4185],"0651CZE050":[129.262,35.4185,129.2882,35.4791],"0651CZE060":[129.2882,35.4791,129.2545,35.5016],"0651CZE065":[129.2545,35.5016,129.2454,35.5165],"0651CZS015":[129.2085,35.2218,129.2057,35.1998],"0651CZS040":[129.262,35.4185,129.2416,35.3285],"0651CZS050":[129.2882,35.4791,129.262,35.4185],"0651CZS060":[129.2545,35.5016,129.2882,35.4791],"0651CZS065":[129.2454,35.5165,129.2545,35.5016],"0652CZE020":[129.2754,35.6195,129.3145,35.739],"0652CZE030":[129.3145,35.739,129.4352,35.7779],"0652CZE040":[129.4352,35.7779,129.3948,35.9241],"0652CZS020":[129.3145,35.739,129.2754,35.6195],"0652CZS030":[129.4352,35.7779,129.3145,35.739],"0652CZS040":[129.3948,35.9241,129.4352,35.7779],"0653CZE010":[129.3879,36.1155,129.3644,36.2017],"0653CZE020":[129.3644,36.2017,129.3548,36.2909],"0653CZE030":[129.3548,36.2909,129.3452,36.3802],"0653CZS010":[129.3644,36.2017,129.3879,36.1155],"0653CZS020":[129.3548,36.2909,129.3644,36.2017],"0653CZS030":[129.3452,36.3802,129.3548,36.2909],"0700CZE020":[128.4693,35.8494,128.4587,35.8711],"0700CZE030":[128.4587,35.8711,128.4682,35.8853],"0700CZE040":[128.4682,35.8853,128.4893,35.9112],"0700CZE050":[128.4893,35.9112,128.5157,35.9169],"0700CZE060":[128.5157,35.9169,128.5348,35.9376],"0700CZE070":[128.5348,35.9376,128.5517,35.9704],"0700CZE100":[128.6113,35.9366,128.6377,35.9348],"0700CZE110":[128.6377,35.9348,128.6894,35.9],"0700CZS030":[128.4682,35.8853,128.4587,35.8711],"0700CZS040":[128.4893,35.9112,128.4682,35.8853],"0700CZS060":[128.5348,35.9376,128.5157,35.9169],"0700CZS070":[128.5517,35.9704,128.5348,35.9376],"0700CZS100":[128.6377,35.9348,128.6113,35.9366],"0700CZS110":[128.6894,35.9,128.6377,35.9348],"1000CZE010":[127.0969,37.405,127.1241,37.4355],"1000CZE030":[127.1241,37.4355,127.1399,37.4605],"1000CZE040":[127.1399,37.4605,127.1556,37.4855],"1000CZE050":[127.1556,37.4855,127.1714,37.5104],"1000CZE055":[127.1714,37.5104,127.195,37.5278],"1000CZE060":[127.195,37.5278,127.1794,37.5501],"1000CZE070":[127.1794,37.5501,127.1638,37.5724],"1000CZE080":[127.1638,37.5724,127.1588,37.5823],"1000CZE090":[127.1588,37.5823,127.2001,37.5895],"1000CZE100":[127.2001,37.5895,127.2413,37.5967],"1000CZE110":[127.2413,37.5967,127.1924,37.619],"1000CZE120":[127.1924,37.619,127.1435,37.6412],"1000CZE130":[127.1435,37.6412,127.0968,37.6456],"1000CZE150":[127.0968,37.6456,127.0501,37.6501],"1000CZE160":[127.0501,37.6501,127.0034,37.6545],"1000CZE170":[127.0034,37.6545,126.9567,37.6589],"1000CZE180":[126.9567,37.6589,126.91,37.6634],"1000CZE190":[126.91,37.6634,126.8633,37.6678],"1000CZE195":[126.8633,37.6678,126.8396,37.6489],"1000CZE200":[126.8396,37.6489,126.816,37.6301],"1000CZE210":[126.816,37.6301,126.7923,37.6112],"1000CZE220":[126.7923,37.6112,126.7687,37.5924],"1000CZE240":[126.7687,37.5924,126.9052,37.2791],"1000CZE250":[126.9052,37.2791,127.0416,36.9659],"1000CZE260":[127.0416,36.9659,127.1781,36.6527],"1000CZE270":[127.1781,36.6527,127.3146,36.3394],"1000CZE280":[127.3146,36.3394,127.451,36.0262],"1000CZE290":[127.451,36.0262,127.5875,35.713],"1000CZE320":[126.8045,37.4515,126.8191,37.4353],"1000CZE330":[126.8191,37.4353,126.8503,37.3944],"1000CZE340":[126.8503,37.3944,126.8687,37.3689],"1000CZE350":[126.8687,37.3689,126.9109,37.3745],"1000CZE360":[126.9109,37.3745,126.953,37.3801],"1000CZE370":[126.953,37.3801,126.9951,37.3856],"1000CZE380":[126.9951,37.3856,127.0249,37.3935],"1000CZE390":[127.0249,37.3935,127.0969,37.405],"1000CZS010":[127.1241,37.4355,127.0969,37.405],"1000CZS030":[127.1399,37.4605,127.1241,37.4355],"1000CZS040":[127.1556,37.4855,127.1399,37.4605],"1000CZS050":[127.1714,37.5104,127.1556,37.4855],"1000CZS055":[127.195,37.5278,127.1714,37.5104],"1000CZS060":[127.1794,37.5501,127.195,37.5278],"1000CZS070":[127.1638,37.5724,127.1794,37.5501],"1000CZS080":[127.1588,37.5823,127.1638,37.5724],"1000CZS090":[127.2001,37.5895,127.1588,37.5823],"1000CZS100":[127.2413,37.5967,127.2001,37.5895],"1000CZS110":[127.1924,37.619,127.2413,37.5967],"1000CZS120":[127.1435,37.6412,127.1924,37.619],"1000CZS130":[127.0968,37.6456,127.1435,37.6412],"1000CZS150":[127.0501,37.6501,127.0968,37.6456],"1000CZS160":[127.0034,37.6545,127.0501,37.6501],"1000CZS170":[126.9567,37.6589,127.0034,37.6545],"1000CZS180":[126.91,37.6634,126.9567,37.6589],"1000CZS190":[126.8633,37.6678,126.91,37.6634],"1000CZS195":[126.8396,37.6489,126.8633,37.6678],"1000CZS200":[126.816,37.6301,126.8396,37.6489],"1000CZS210":[126.7923,37.6112,126.816,37.6301],"1000CZS220":[126.7687,37.5924,126.7923,37.6112],"1000CZS240":[126.9052,37.2791,126.7687,37.5924],"1000CZS250":[127.0416,36.9659,126.9052,37.2791],"1000CZS260":[127.1781,36.6527,127.0416,36.9659],"1000CZS270":[127.3146,36.3394,127.1781,36.6527],"1000CZS280":[127.451,36.0262,127.3146,36.3394],"1000CZS290":[127.5875,35.713,127.451,36.0262],"1000CZS320":[126.8191,37.4353,126.8045,37.4515],"1000CZS330":[126.8503,37.3944,126.8191,37.4353],"1000CZS340":[126.8687,37.3689,126.8503,37.3944],"1000CZS350":[126.9109,37.3745,126.8687,37.3689],"1000CZS360":[126.953,37.3801,126.9109,37.3745],"1000CZS370":[126.9951,37.3856,126.953,37.3801],"1000CZS380":[127.0249,37.3935,126.9951,37.3856],"1000CZS390":[127.0969,37.405,127.0249,37.3935],"1020CZE050":[128.606,35.2594,128.6477,35.275],"1020CZS050":[128.6477,35.275,128.606,35.2594],"1040CZE010":[128.7959,35.2181,128.8082,35.1986],"1040CZE015":[128.8082,35.1986,128.8402,35.1852],"1040CZE020":[128.8402,35.1852,128.8722,35.1718],"1040CZS010":[128.8082,35.1986,128.7959,35.2181],"1040CZS015":[128.8402,35.1852,128.8082,35.1986],"1040CZS020":[128.8722,35.1718,128.8402,35.1852],"1100CZE060":[126.7645,37.4328,126.7918,37.4341],"1100CZE070":[126.7918,37.4341,126.8191,37.4353],"1100CZS060":[126.7918,37.4341,126.7645,37.4328],"1100CZS070":[126.8191,37.4353,126.7918,37.4341],"1510CZE010":[126.7749,36.0524,126.7708,36.0603],"1510CZE020":[126.7708,36.0603,126.7956,36.2377],"1510CZE025":[126.7956,36.2377,126.827,36.2793],"1510CZE030":[126.827,36.2793,126.8541,36.2944],"1510CZE040":[126.8541,36.2944,126.9426,36.3785],"1510CZE050":[126.9426,36.3785,127.0543,36.4585],"1510CZE060":[127.0543,36.4585,127.0593,36.4849],"1510CZS010":[126.7708,36.0603,126.7749,36.0524],"1510CZS020":[126.7956,36.2377,126.7708,36.0603],"1510CZS025":[126.827,36.2793,126.7956,36.2377],"1510CZS030":[126.8541,36.2944,126.827,36.2793],"1510CZS040":[126.9426,36.3785,126.8541,36.2944],"1510CZS050":[127.0543,36.4585,126.9426,36.3785],"1510CZS060":[127.0593,36.4849,127.0543,36.4585],"2510CZE020":[127.1325,36.124,127.2045,36.1887],"2510CZE025":[127.2045,36.1887,127.2765,36.2533],"2510CZE030":[127.2765,36.2533,127.3143,36.298],"2510CZE040":[127.3143,36.298,127.3286,36.3647],"2510CZE050":[127.3286,36.3647,127.3442,36.3941],"2510CZE060":[127.3442,36.3941,127.3805,36.4154],"2510CZE070":[127.3805,36.4154,127.4184,36.4013],"2510CZS020":[127.2045,36.1887,127.1325,36.124],"2510CZS025":[127.2765,36.2533,127.2045,36.1887],"2510CZS030":[127.3143,36.298,127.2765,36.2533],"2510CZS040":[127.3286,36.3647,127.3143,36.298],"2510CZS050":[127.3442,36.3941,127.3286,36.3647],"2510CZS060":[127.3805,36.4154,127.3442,36.3941],"2510CZS070":[127.4184,36.4013,127.3805,36.4154],"3000CZE010":[127.3143,36.298,127.324,36.2896],"3000CZE020":[127.324,36.2896,127.3765,36.2809],"3000CZE030":[127.3765,36.2809,127.4567,36.2873],"3000CZS010":[127.324,36.2896,127.3143,36.298],"3000CZS020":[127.3765,36.2809,127.324,36.2896],"3000CZS030":[127.4567,36.2873,127.3765,36.2809],"4000CZE010":[127.0025,37.1744,127.0553,37.1869],"4000CZE020":[127.0553,37.1869,127.0916,37.1779],"4000CZS010":[127.0553,37.1869,127.0025,37.1744],"4000CZS020":[127.0916,37.1779,127.0553,37.1869],"4002CZE040":[127.0511,37.8567,126.9872,37.8483],"4002CZE050":[126.9872,37.8483,126.8712,37.8319],"4002CZS040":[126.9872,37.8483,127.0511,37.8567],"4002CZS050":[126.8712,37.8319,126.9872,37.8483],"4003CZE010":[126.9668,37.191,126.9353,37.1911],"4003CZE020":[126.9353,37.1911,126.9038,37.1912],"4003CZE030":[126.9038,37.1912,126.8723,37.1913],"4003CZS010":[126.9353,37.1911,126.9668,37.191],"4003CZS030":[126.8723,37.1913,126.9038,37.1912],"4004CZE010":[127.0916,37.1779,127.1236,37.2084],"4004CZE020":[127.1236,37.2084,127.1556,37.239],"4004CZE030":[127.1556,37.239,127.1876,37.2695],"4004CZE040":[127.1876,37.2695,127.2286,37.2802],"4004CZE050":[127.2286,37.2802,127.2329,37.2888],"4004CZE060":[127.2329,37.2888,127.3104,37.3016],"4004CZE070":[127.3104,37.3016,127.3513,37.3123],"4004CZS010":[127.1236,37.2084,127.0916,37.1779],"4004CZS020":[127.1556,37.239,127.1236,37.2084],"4004CZS030":[127.1876,37.2695,127.1556,37.239],"4004CZS040":[127.2286,37.2802,127.1876,37.2695],"4004CZS050":[127.2329,37.2888,127.2286,37.2802],"4004CZS060":[127.3104,37.3016,127.2329,37.2888],"4004CZS070":[127.3513,37.3123,127.3104,37.3016],"4005CZE010":[127.4402,37.5178,127.3836,37.5641],"4005CZE020":[127.3836,37.5641,127.3356,37.5903],"4005CZE030":[127.3356,37.5903,127.3263,37.6331],"4005CZS010":[127.3836,37.5641,127.4402,37.5178],"4005CZS020":[127.3356,37.5903,127.3836,37.5641],"4005CZS030":[127.3263,37.6331,127.3356,37.5903],"4007CZE030":[128.132,37.7853,127.9306,37.7473],"4007CZE040":[127.9306,37.7473,127.7292,37.7092],"4007CZE050":[127.7292,37.7092,127.5277,37.6712],"4007CZE060":[127.5277,37.6712,127.3263,37.6331],"4007CZS030":[127.9306,37.7473,128.132,37.7853],"4007CZS040":[127.7292,37.7092,127.9306,37.7473],"4007CZS050":[127.5277,37.6712,127.7292,37.7092],"4007CZS060":[127.3263,37.6331,127.5277,37.6712],"4510CZE010":[128.4356,35.6682,128.4563,35.7166],"4510CZE015":[128.4563,35.7166,128.477,35.7649],"4510CZE040":[128.4804,35.7973,128.501,35.8146],"4510CZE045":[128.501,35.8146,128.5215,35.8319],"4510CZE080":[128.5253,35.8844,128.5244,35.8953],"4510CZS010":[128.4563,35.7166,128.4356,35.6682],"4510CZS015":[128.477,35.7649,128.4563,35.7166],"4510CZS040":[128.501,35.8146,128.4804,35.7973],"4510CZS045":[128.5215,35.8319,128.501,35.8146],"4510CZS080":[128.5244,35.8953,128.5253,35.8844],"5000CZE010":[126.7549,35.191,126.7936,35.2223],"5000CZE020":[126.7936,35.2223,126.7974,35.2555],"5000CZS010":[126.7936,35.2223,126.7549,35.191],"5000CZS020":[126.7974,35.2555,126.7936,35.2223],"5510CZE005":[128.9141,35.2245,128.9647,35.2665],"5510CZE010":[128.9647,35.2665,129.0152,35.3085],"5510CZE020":[129.0152,35.3085,129.0283,35.3238],"5510CZE030":[129.0283,35.3238,129.0397,35.3386],"5510CZS005":[128.9647,35.2665,128.9141,35.2245],"5510CZS010":[129.0152,35.3085,128.9647,35.2665],"5510CZS020":[129.0283,35.3238,129.0152,35.3085],"5510CZS030":[129.0397,35.3386,129.0283,35.3238],"6000CZE010":[128.7053,35.279,128.7611,35.3013],"6000CZE020":[128.7611,35.3013,128.8116,35.2952],"6000CZE030":[128.8116,35.2952,128.8946,35.3055],"6000CZE040":[128.8946,35.3055,128.984,35.2876],"6000CZE050":[128.984,35.2876,128.9995,35.2705],"6000CZE060":[128.9995,35.2705,129.0869,35.2952],"6000CZE070":[129.0869,35.2952,129.1107,35.2802],"6000CZE080":[129.1107,35.2802,129.1538,35.2868],"6000CZE090":[129.1538,35.2868,129.2275,35.284],"6000CZS010":[128.7611,35.3013,128.7053,35.279],"6000CZS020":[128.8116,35.2952,128.7611,35.3013],"6000CZS030":[128.8946,35.3055,128.8116,35.2952],"6000CZS040":[128.984,35.2876,128.8946,35.3055],"6000CZS050":[128.9995,35.2705,128.984,35.2876],"6000CZS060":[129.0869,35.2952,128.9995,35.2705],"6000CZS070":[129.1107,35.2802,129.0869,35.2952],"6000CZS080":[129.1538,35.2868,129.1107,35.2802],"6000CZS090":[129.2275,35.284,129.1538,35.2868]},"rests":[["서울만남(부산)휴게소",127.0425,37.4599],["죽전(서울)휴게소",127.1044,37.3326],["기흥(부산)휴게소",127.1052,37.2351],["안성(서울)휴게소",127.1318,37.0764],["안성(부산)휴게소",127.145,37.0136],["망향(부산)휴게소",127.1812,36.8549],["옥산(부산)휴게소",127.3707,36.657],["천안삼거리(서울)휴게소",127.1731,36.7877],["천안호두(부산)휴게소",127.2641,36.7306],["죽암(서울)휴게소",127.4304,36.4968],["죽암(부산)휴게소",127.4296,36.4869],["금강(부산)휴게소",127.6716,36.2791],["옥천(서울)휴게소",127.5988,36.2975],["황간(서울)휴게소",127.8546,36.2494],["황간(부산)휴게소",127.853,36.249],["입장거봉포도(서울)휴게소",127.1922,36.9424],["추풍령(서울)휴게소",128.0029,36.2001],["추풍령(부산)휴게소",128.0008,36.2005],["칠곡(서울)휴게소",128.4303,36.0122],["경산(서울)휴게소",128.8097,35.8786],["평사(부산)휴게소",128.8672,35.8857],["칠곡(부산)휴게소",128.4293,36.0195],["건천(서울)휴게소",129.1093,35.8315],["건천(부산)휴게소",129.1095,35.8303],["언양(서울)휴게소",129.1415,35.598],["언양(부산)휴게소",129.1389,35.5955],["신탄진(서울)휴게소",127.4181,36.4265],["옥천(부산)휴게소",127.5956,36.2973],["경주(부산)휴게소",129.1933,35.7239],["청주(서울)휴게소",127.3481,36.716],["양산(서울)휴게소",129.0564,35.3232],["김천(서울)휴게소",128.1637,36.1309],["김천(부산)휴게소",128.1649,36.1293],["서울하이패스센터쉼터",127.103,37.3723],["통도사(부산)휴게소",129.0915,35.4887],["옥천만남휴게소",127.5713,36.3091],["기흥복합휴게소",127.1052,37.2351],["섬진강(순천)휴게소",127.7692,34.985],["섬진강(부산)휴게소",127.7703,34.9848],["진영(순천)휴게소",128.716,35.2797],["진영(부산)휴게소",128.7157,35.2783],["문산(순천)휴게소",128.1523,35.1714],["사천(순천)휴게소",128.0126,35.0747],["사천(부산)휴게소",128.0108,35.0736],["진주(부산)휴게소",128.122,35.1601],["함안(부산)휴게소",128.3468,35.2938],["함안(순천)휴게소",128.3445,35.2941],["보성녹차(영암)휴게소",127.126,34.814],["보성녹차(순천)휴게소",127.181,34.8076],["함평나비(광주)휴게소",126.5116,35.0376],["함평나비(무안)휴게소",126.509,35.038],["화성(서울)휴게소",126.8809,37.1435],["화성(목포)휴게소",126.8794,37.1448],["행담도휴게소",126.8078,36.9446],["대천(서울)휴게소",126.5577,36.3742],["대천(목포)휴게소",126.5562,36.3733],["서산(서울)휴게소",126.5659,36.7339],["서산(목포)휴게소",126.5656,36.7429],["군산(서울)휴게소",126.7971,36.0188],["군산(목포)휴게소",126.8292,35.981],["고창고인돌(서울)휴게소",126.6727,35.4622],["고창고인돌(목포)휴게소",126.6741,35.4682],["함평천지(목포)휴게소",126.4787,35.0694],["함평천지(서울)휴게소",126.4818,35.1307],["홍성(서울)휴게소",126.5815,36.5531],["홍성(목포)휴게소",126.58,36.5528],["서천(서울)휴게소",126.6274,36.1315],["서천(목포)휴게소",126.6267,36.1298],["목감(서울)휴게소",126.8699,37.3901],["부안하쉼터",126.7325,35.672],["부안상쉼터",126.7345,35.6722],["대산(서울)휴게소",126.5778,35.343],["영광(목포)휴게소",126.5096,35.2428],["익산미륵사지(천안)휴게소",127.1045,36.0486],["익산미륵사지(순천)휴게소",127.103,36.0487],["정읍녹두장군(천안)휴게소",126.864,35.6005],["정읍녹두장군(순천)휴게소",126.862,35.601],["주암(순천)휴게소",127.2643,35.0764],["곡성(천안)휴게소",127.1525,35.2592],["백양사(천안)휴게소",126.807,35.3931],["백양사(순천)휴게소",126.8057,35.3944],["주암(천안)휴게소",127.2655,35.0768],["곡성(순천)휴게소",127.1509,35.2586],["순천(순천)휴게소",127.4442,35.0091],["이서(천안)휴게소",127.0253,35.802],["이서(순천)휴게소",127.0243,35.804],["오수(순천)휴게소",127.3096,35.5407],["오수(완주)휴게소",127.3113,35.5403],["황전(순천)휴게소",127.4546,35.1487],["황전(완주)휴게소",127.4546,35.1527],["관촌(광양)휴게소",127.267,35.6891],["관촌(전주)휴게소",127.2671,35.6909],["속리산(청주)휴게소",127.8695,36.4475],["화서(영덕)휴게소",127.9228,36.4445],["공주(대전)휴게소",127.1666,36.4972],["공주(당진)휴게소",127.1653,36.4982],["예산(대전)휴게소",126.8402,36.6234],["예산(당진)휴게소",126.8462,36.619],["면천(당진)휴게소",126.6796,36.7911],["면천(대전)휴게소",126.6788,36.7905],["신풍(당진)휴게소",126.9993,36.5196],["신풍(대전)휴게소",126.9968,36.5234],["상주(청원)휴게소",128.1815,36.3747],["상주(영덕)휴게소",128.1814,36.3737],["의성(청주)휴게소",128.4448,36.4108],["의성(영덕)휴게소",128.4476,36.4096],["청송(청주)휴게소",129.0116,36.4567],["청송(영덕)휴게소",129.0138,36.4557],["점곡(상주)휴게소",128.0038,37.7576],["점곡(영덕)휴게소",128.0062,37.7587],["산청(대전)휴게소",127.9387,35.3336],["산청(통영)휴게소",127.9375,35.3337],["금산인삼랜드(대전)휴게소",127.4971,36.1545],["금산인삼랜드(통영)휴게소",127.496,36.1537],["덕유산(대전)휴게소",127.6456,35.8163],["덕유산(통영)휴게소",127.6436,35.8134],["고성공룡나라(대전)휴게소",128.2523,35.0563],["고성공룡나라(통영)휴게소",128.2629,35.0521],["하남드림휴게소",127.2065,37.531],["이천쌀(하남)휴게소",127.3778,37.2934],["이천(남이)휴게소",127.4036,37.2651],["오창(하남)휴게소",127.4815,36.7565],["오창(남이)휴게소",127.4821,36.7584],["음성(하남)휴게소",127.4838,37.0218],["음성(남이)휴게소",127.4815,37.0197],["마장휴게소",127.4066,37.2642],["안성맞춤(평택)휴게소",127.2748,36.9697],["안성맞춤(제천)휴게소",127.2742,36.9683],["금왕(평택)휴게소",127.5896,36.9703],["금왕(제천)휴게소",127.5906,36.9692],["천등산(평택)휴게소",127.989,37.0767],["천등산(제천)휴게소",127.9395,37.0617],["영산(창원)휴게소",128.4961,35.4296],["칠서(양평)휴게소",128.4966,35.371],["선산(양평)휴게소",128.249,36.2777],["선산(창원)휴게소",128.2507,36.2746],["충주(양평)휴게소",127.8389,37.0229],["충주(창원)휴게소",127.8376,37.0224],["괴산(양평)휴게소",127.9597,36.8318],["괴산(창원)휴게소",127.9583,36.8313],["문경(양평)휴게소",128.1521,36.6205],["문경(창원)휴게소",128.1503,36.6209],["남성주참외(창원)휴게소",128.3169,35.8687],["남성주참외(양평)휴게소",128.3196,35.8579],["서여주(양평)휴게소",127.5801,37.2789],["서여주(창원)휴게소",127.5787,37.2789],["성주(양평)휴게소",128.2603,36.0103],["성주(창원)휴게소",128.2609,36.0085],["용인(인천)휴게소",127.2383,37.2479],["용인(강릉)휴게소",127.2424,37.2459],["여주(인천)휴게소",127.5701,37.2396],["여주(강릉)휴게소",127.569,37.2385],["문막(인천)휴게소",127.8177,37.2977],["횡성(인천)휴게소",128.1349,37.4647],["횡성(강릉)휴게소",128.1344,37.4633],["문막(강릉)휴게소",127.8577,37.3354],["평창(인천)휴게소",128.4633,37.6101],["평창(강릉)휴게소",128.4531,37.6058],["강릉(인천)휴게소",128.8056,37.7593],["강릉(강릉)휴게소",128.8063,37.758],["덕평휴게소",127.3894,37.2413],["홍천강(춘천)휴게소",127.8274,37.7126],["치악(부산)휴게소",128.0493,37.2539],["치악(춘천)휴게소",128.0486,37.2562],["안동(부산)휴게소",128.6427,36.5534],["안동(춘천)휴게소",128.6445,36.5535],["군위(부산)휴게소",128.5753,36.2664],["군위(춘천)휴게소",128.5765,36.2657],["단양팔경(부산)휴게소",128.2876,36.9949],["단양팔경(춘천)휴게소",128.3231,36.9422],["춘천(부산)휴게소",127.7665,37.8125],["동명(춘천)휴게소",128.5488,36.0062],["동명(부산)휴게소",128.5469,36.0068],["원주(부산)휴게소",127.9293,37.4352],["원주(춘천)휴게소",127.9315,37.4347],["영주(부산)휴게소",128.5475,36.8059],["영주(춘천)휴게소",128.5488,36.8061],["제천(춘천)휴게소",128.1573,37.0928],["제천(부산)휴게소",128.1501,37.1027],["홍천(서울)휴게소",128.2872,37.9164],["홍천(양양)휴게소",129.0032,35.2697],["동해(삼척)휴게소",129.0742,37.6016],["옥계(속초)휴게소",129.0595,37.6158],["구정(속초)휴게소",128.854,37.7227],["구정(삼척)휴게소",128.8515,37.7225],["양양(동해)휴게소",128.7528,37.953],["양양(속초)휴게소",128.7679,37.9362],["외동(포항)휴게소",129.2878,35.6729],["외동(부산)휴게소",129.2862,35.6727],["양북임시(상)휴게소",129.4204,35.8095],["양북임시(하)휴게소",129.4201,35.8111],["의왕(일산)휴게소",127.0227,37.3934],["서하남행복드림쉼터",127.1931,37.5258],["구리(일산)휴게소",127.1391,37.628],["장유(서부산)휴게소",128.7941,35.2121],["부여백제(공주)휴게소",126.7998,36.2587],["부여백제(서천)휴게소",126.7969,36.2577],["청양(서천)휴게소",126.9903,36.3984],["청양(공주)휴게소",126.9929,36.3996],["벌곡(대전)휴게소",127.2703,36.2105],["벌곡(논산)휴게소",127.274,36.2178],["현풍(대구)휴게소",128.4377,35.7024],["현풍(창원)휴게소",128.436,35.7023]]};         // 소통 구간(콘존) 양 끝 좌표와 휴게소 좌표: scripts/build_cz.py가 생성
+const DEF = { name: '동대구역', sub: '기본 출발지', lat: 35.8797, lon: 128.6286 };
+const DEMO = { name: '수성못', sub: '대구광역시 수성구', lat: 35.8283, lon: 128.6176 };
+function seedDB() {
+  return { v: 4, id: 'rm-' + Math.random().toString(36).slice(2, 10), points: [], events: [], trips: [], hist: [], fav: { home: null, work: null },
+    settings: { voice: true, cruiseOnly: false, checkin: true, share: true, cmin: 10, theme: 'system' } };
+}
+let DB = store.get('nav', null); if (!DB || DB.v !== 4) DB = seedDB();
+const save = () => store.set('nav', DB);
+const S = DB.settings; if (!S.theme) S.theme = 'system';
+const rate = p => p.pass ? p.hit / p.pass : 0;
+const isPublic = p => p.veh >= 5 && rate(p) >= 0.08;
+const per100 = v => Math.round(v * 100);
+
+/* ================= geometry ================= */
+const RE = 6371000, rad = d => d * Math.PI / 180;
+function dist(a, b) { const x = rad(b[0] - a[0]) * Math.cos(rad((a[1] + b[1]) / 2)), y = rad(b[1] - a[1]); return Math.hypot(x, y) * RE; }
+function bearing(a, b) {
+  const y = Math.sin(rad(b[0] - a[0])) * Math.cos(rad(b[1])), x = Math.cos(rad(a[1])) * Math.sin(rad(b[1])) - Math.sin(rad(a[1])) * Math.cos(rad(b[1])) * Math.cos(rad(b[0] - a[0]));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+const near = (a, b, m = 80) => dist([a.lon, a.lat], [b.lon, b.lat]) < m;
+function idxAt(r, m) { let lo = 0, hi = r.cum.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (r.cum[mid] <= m) lo = mid; else hi = mid; } return lo; }
+function posAt(r, m) {
+  m = clamp(m, 0, r.len); const i = idxAt(r, m), a = r.c[i], b = r.c[i + 1] || a, f = (m - r.cum[i]) / ((r.cum[i + 1] - r.cum[i]) || 1);
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+}
+function headAt(r, m) { const a = posAt(r, m), b = posAt(r, Math.min(r.len, m + 25)); return dist(a, b) < 2 ? bearing(posAt(r, Math.max(0, m - 25)), a) : bearing(a, b); }
+function project(r, p) {          // 경로 위 가장 가까운 점: {d: 떨어진 거리(m), m: 출발지부터의 거리(m)}
+  const kx = Math.cos(rad(p[1])), best = { d: 1e12, m: 0 };
+  for (let i = 0; i < r.c.length - 1; i++) {
+    const a = r.c[i], b = r.c[i + 1], ax = (a[0] - p[0]) * kx, ay = a[1] - p[1], dx = (b[0] - a[0]) * kx, dy = b[1] - a[1], L = dx * dx + dy * dy;
+    const t = L ? clamp(-(ax * dx + ay * dy) / L, 0, 1) : 0, d = Math.hypot(ax + dx * t, ay + dy * t) * rad(1) * RE;
+    if (d < best.d) { best.d = d; best.m = r.cum[i] + (r.cum[i + 1] - r.cum[i]) * t; }
+  }
+  return best;
+}
+function tAt(r, m) { m = clamp(m, 0, r.len); const i = idxAt(r, m), f = (m - r.cum[i]) / ((r.cum[i + 1] - r.cum[i]) || 1); return r.cumT[i] + ((r.cumT[i + 1] || r.cumT[i]) - r.cumT[i]) * f; }
+function sliceOf(r, a, b) { return [posAt(r, a), ...r.c.slice(idxAt(r, a) + 1, idxAt(r, b) + 1), posAt(r, b)]; }
+const speedAt = (r, m) => clamp(r.sp[Math.min(idxAt(r, m), r.sp.length - 1)] || 40, 15, 110);
+const fmtDist = m => m >= 1000 ? (m / 1000).toFixed(m >= 10000 ? 0 : 1) + 'km' : Math.max(10, Math.round(m / 10) * 10) + 'm';
+const fmtDur = s => s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.round(s % 3600 / 60)}분` : `${Math.max(1, Math.round(s / 60))}분`;
+
+/* ================= open data: 검색(Photon) · 경로(OSRM) · 도로 시설(Overpass) ================= */
+async function getJSON(url, opt = {}, ms = 12000) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+  try { const r = await fetch(url, Object.assign({ signal: ac.signal }, opt)); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); } finally { clearTimeout(t); }
+}
+function placeOf(f) {
+  const p = f.properties, name = p.name || [p.street, p.housenumber].filter(Boolean).join(' ') || p.locality || p.district || p.city || '선택한 위치';
+  const sub = [p.city || p.county || p.state, p.district, p.locality, p.street].filter((x, i, a) => x && x !== name && a.indexOf(x) === i).join(' ');
+  return { name, sub, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] };
+}
+async function search(q, final) {
+  const c = map.getCenter(); let out = [];
+  try {
+    const d = await getJSON(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&bbox=124.5,33,131.9,38.7&lat=${c.lat.toFixed(1)}&lon=${c.lng.toFixed(1)}`);
+    out = d.features.filter(f => f.properties.countrycode === 'KR').map(placeOf);
+  } catch (e) { /* fall through to the second geocoder */ }
+  if (!out.length && final) try {
+    const d = await getJSON(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&countrycodes=kr&limit=8&accept-language=ko`);
+    out = d.map(x => { const parts = x.display_name.split(',').map(s => s.trim()); return { name: x.name || parts[0], sub: parts.slice(1, 4).reverse().join(' '), lat: +x.lat, lon: +x.lon }; });
+  } catch (e) { /* no result */ }
+  return out.filter((x, i, a) => a.findIndex(y => y.name === x.name && near(x, y, 150)) === i);
+}
+async function reverse(lat, lon) {
+  try { const d = await getJSON(`https://photon.komoot.io/reverse?lon=${lon.toFixed(5)}&lat=${lat.toFixed(5)}`, {}, 6000); if (d.features[0]) { const p = placeOf(d.features[0]); return { name: p.name, sub: p.sub }; } } catch (e) { /* keep coordinates */ }
+  return null;
+}
+function buildRoute(o) {
+  const c = o.geometry.coordinates, cum = [0];
+  for (let i = 1; i < c.length; i++) cum.push(cum[i - 1] + dist(c[i - 1], c[i]));
+  const len = cum[cum.length - 1], k = len / (o.distance || len), steps = [], sp = [], cumT = [0]; let acc = 0;
+  for (const leg of o.legs) {
+    for (const s of leg.steps) {
+      steps.push({ m: acc * k, type: s.maneuver.type, mod: s.maneuver.modifier || '', name: s.name || '', ref: s.ref || '', dest: s.destinations || '', exit: s.maneuver.exit, nb: ((s.intersections[0] || {}).bearings || []).length });
+      acc += s.distance;
+    }
+    const a = leg.annotation || { distance: [], duration: [] };
+    for (let i = 0; i < a.distance.length; i++) { sp.push(a.duration[i] > 0 ? a.distance[i] / a.duration[i] * 3.6 : 30); cumT.push(cumT[cumT.length - 1] + a.duration[i]); }
+  }
+  while (cumT.length < c.length) cumT.push(cumT[cumT.length - 1]);
+  if (!(cumT[c.length - 1] > 0)) for (let i = 0; i < c.length; i++) cumT[i] = cum[i] / (len || 1) * o.duration;
+  const r = { c, cum, len, dur: o.duration, kt: o.duration / (cumT[c.length - 1] || 1), cumT, steps, sp, raw: [], hz: [], rests: [], tf: [], osm: null };
+  r.rests = restsOn(r); mapTraffic(r); return r;
+}
+async function fetchRoutes(pts) {
+  const d = await getJSON(`https://router.project-osrm.org/route/v1/driving/${pts.map(p => p.lon.toFixed(6) + ',' + p.lat.toFixed(6)).join(';')}?overview=full&geometries=geojson&steps=true&annotations=distance,duration&alternatives=${pts.length === 2 ? 3 : false}`, {}, 20000);
+  if (d.code !== 'Ok' || !d.routes.length) throw new Error(d.code);
+  return d.routes.map(buildRoute);
+}
+/* 유의지점 1: 경로 안내 정보(합류·분기·사거리)와 경로 모양(급커브)에서 찾는다 */
+function detectLocal(r) {
+  const hz = [];
+  r.steps.forEach((s, i) => {
+    if (!i || s.type === 'arrive') return;
+    const road = s.name || s.ref;
+    if (/터널$/.test(s.name) && r.steps[i + 1] && r.steps[i + 1].m - s.m >= 200) hz.push({ m: r.steps[i + 1].m, tpl: 'tunnel', name: `${s.name} 출구` });
+    if (s.type === 'merge') hz.push({ m: s.m, tpl: 'merge', name: `${road ? road + ' ' : ''}합류 구간` });
+    else if (s.type === 'fork' || s.type === 'off ramp') hz.push({ m: s.m, tpl: 'diverge', name: `${s.dest ? s.dest.split(',')[0].trim() + ' 방면 ' : ''}${s.type === 'fork' ? '분기점' : '진출로'}` });
+    else if ((s.type === 'turn' || s.type === 'end of road' || s.type === 'continue') && s.nb >= 4 && /left|right/.test(s.mod) && !/slight/.test(s.mod)) hz.push({ m: s.m, tpl: 'left', name: `${road ? road + ' ' : ''}사거리` });
+  });
+  // ponytail: 20m 간격으로 진행 방향을 재고 100m 사이에 50° 이상 꺾이면 급커브로 본다. 도로 곡률 데이터가 생기면 교체.
+  const N = Math.floor(r.len / 20), hd = [];
+  for (let i = 0; i < N; i++) hd.push(bearing(posAt(r, i * 20), posAt(r, i * 20 + 20)));
+  const turns = r.steps.filter(s => !['merge', 'fork', 'off ramp', 'on ramp', 'new name'].includes(s.type)).map(s => s.m);
+  let run = null;
+  for (let i = 0; i + 5 < N; i++) {
+    const m = i * 20, d = Math.abs(((hd[i + 5] - hd[i] + 540) % 360) - 180);
+    if (d >= 50 && m > 150 && m < r.len - 150 && !turns.some(t => Math.abs(t - (m + 50)) < 80)) { if (!run) run = { m }; run.end = m; }
+    else if (run && m - run.end > 80) { hz.push({ m: run.m + 40, tpl: 'curve', name: '급커브 구간' }); run = null; }
+  }
+  if (run) hz.push({ m: run.m + 40, tpl: 'curve', name: '급커브 구간' });
+  return hz;
+}
+/* 유의지점 2: 경로 주변 초등학교(어린이보호구역 추정). 응답이 빠른 Photon 검색을 구간별로 쓴다 */
+async function detectSchools(r) {
+  // ponytail: 구간은 최대 16개. 아주 긴 시내 경로는 구간이 넓어져 50곳 제한에 걸릴 수 있다. 그때는 구간을 더 잘게 나눈다.
+  const L = Math.max(2000, r.len / 16), jobs = [];
+  for (let m0 = 0; m0 < r.len; m0 += L) {
+    const m1 = Math.min(r.len, m0 + L); let x0 = 180, y0 = 90, x1 = -180, y1 = -90, slowest = 999;
+    for (let i = idxAt(r, m0); i <= Math.min(idxAt(r, m1) + 1, r.c.length - 1); i++) { const c = r.c[i]; x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); }
+    for (let k = 0; k <= 4; k++) slowest = Math.min(slowest, speedAt(r, m0 + (m1 - m0) * k / 4));
+    if (slowest > 70) continue;       // 고속 구간에는 어린이보호구역이 없다
+    jobs.push(getJSON(`https://photon.komoot.io/api/?q=school&osm_tag=amenity:school&bbox=${(x0 - 0.003).toFixed(4)},${(y0 - 0.0025).toFixed(4)},${(x1 + 0.003).toFixed(4)},${(y1 + 0.0025).toFixed(4)}&limit=50`, {}, 9000).catch(() => null));
+  }
+  const res = await Promise.all(jobs); if (jobs.length && res.every(d => !d)) throw new Error('photon');
+  const hz = [], seen = new Set();
+  for (const d of res) for (const f of (d ? d.features : [])) {
+    const n = (f.properties.name || '').replace(/\s+/g, ''); if (!/초등/.test(n) || seen.has(n)) continue;
+    const pr = project(r, f.geometry.coordinates);
+    if (pr.d <= 200 && speedAt(r, pr.m) <= 70) { seen.add(n); hz.push({ m: pr.m, tpl: 'school', name: `${n} 어린이보호구역` }); }
+  }
+  return hz;
+}
+/* 유의지점 3: OpenStreetMap의 단속카메라·터널. 공개 Overpass 서버는 느릴 때가 많아 여러 곳에 동시에 묻고 먼저 온 답을 쓴다 */
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+async function detectOSM(r) {
+  const n = clamp(Math.ceil(r.len / 250), 2, 300), gap = r.len / n, pts = [];
+  for (let i = 0; i <= n; i++) { const p = posAt(r, r.len * i / n); pts.push(p[1].toFixed(5), p[0].toFixed(5)); }
+  const L = pts.join(','), w = Math.round(gap * 0.15);
+  const q = `[out:json][timeout:20];(node(around:${45 + w},${L})[highway=speed_camera];way(around:${40 + w},${L})[highway][tunnel=yes];);out tags center geom 400;`;
+  const d = await Promise.any(OVERPASS.map(url => getJSON(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 45000)));
+  const hz = [], tun = [];
+  for (const e of d.elements) {
+    const t = e.tags || {}, ctr = e.type === 'node' ? [e.lon, e.lat] : e.center ? [e.center.lon, e.center.lat] : null;
+    if (t.highway === 'speed_camera') { const pr = project(r, ctr); const mx = parseInt(t.maxspeed) || null; if (pr.d <= 35) hz.push({ m: pr.m, tpl: 'cam', name: `과속 단속 카메라${mx ? ` (제한 ${mx}km/h)` : ''}`, max: mx }); }
+    else if (t.tunnel) {
+      const g = e.geometry || []; if (g.length < 2) continue;
+      const a = project(r, [g[0].lon, g[0].lat]), b = project(r, [g[g.length - 1].lon, g[g.length - 1].lat]); if (a.d > 25 || b.d > 25) continue;
+      const lo = Math.min(a.m, b.m), hi = Math.max(a.m, b.m), name = t.name || '터널', cur = tun.find(x => x.name === name && lo - x.hi < 300 && x.lo - hi < 300);
+      if (cur) { cur.lo = Math.min(cur.lo, lo); cur.hi = Math.max(cur.hi, hi); } else tun.push({ name, lo, hi });
+    }
+  }
+  for (const x of tun) if (x.hi - x.lo >= 200) hz.push({ m: x.hi, tpl: 'tunnel', name: `${x.name} 출구` });
+  return { hz };
+}
+const PRI = { school: 0, curve: 1, diverge: 2, merge: 2, left: 3, tunnel: 3, cam: 4 };
+function finalize(r) {            // 내 기록·공개 개입 지점을 합치고 120m 안의 중복을 정리
+  const all = r.raw.map(h => Object.assign({}, h, { pid: null }));
+  for (const p of DB.points) {
+    if (!(isPublic(p) || p.mine)) continue;
+    const pr = project(r, [p.lon, p.lat]); if (pr.d > 40) continue;
+    const at = all.find(h => h.tpl !== 'cam' && Math.abs(h.m - pr.m) < 200);
+    if (at) at.pid = p.id; else all.push({ m: pr.m, tpl: p.tpl, name: p.name, pid: p.id });
+  }
+  all.sort((a, b) => (PRI[a.tpl] - PRI[b.tpl]) || a.m - b.m);
+  const keep = []; for (const h of all) if (!keep.some(k => Math.abs(k.m - h.m) < 120)) keep.push(h);
+  keep.sort((a, b) => a.m - b.m);
+  for (const h of keep) { const p = posAt(r, h.m); h.id = h.tpl + Math.round(h.m / 10); h.lon = p[0]; h.lat = p[1]; }
+  r.hz = keep;
+}
+function ensureOSM(r) {
+  if (r.osm) return r.osm;
+  const done = () => { finalize(r); if (route() === r) { drawMarkers(); if (!A.trip) render(); } };
+  detectOSM(r).then(x => { r.raw.push(...x.hz); r.osmOk = true; log('App', `도로 시설 조회: 단속카메라·터널 ${x.hz.length}곳`); })
+    .catch(() => { r.osmOk = false; log('App', '단속카메라·터널 조회 실패(공개 서버 혼잡)'); }).then(done);
+  // 출발 전 브리핑은 학교 조회까지만 기다린다
+  return r.osm = detectSchools(r).then(hz => { r.raw.push(...hz); r.schoolOk = true; log('App', `초등학교 주변 어린이보호구역 ${hz.length}곳`); })
+    .catch(() => { r.schoolOk = false; log('App', '초등학교 조회 실패'); }).then(done);
+}
+
+/* ================= 실시간 고속도로 교통: 한국도로공사 공공데이터(로드플러스와 같은 VDS 소통 정보) ================= */
+const TR = { at: 0, std: '', list: [], loading: false, err: false };
+const GRADE = { 1: ['원활', 'ok', '#16A34A'], 2: ['서행', 'warn', '#F59E0B'], 3: ['정체', 'crit', '#E5484D'] };
+async function loadTraffic(force) {
+  if (TR.loading || (!force && Date.now() - TR.at < 240000)) return;
+  TR.loading = true;
+  try {
+    const d = await getJSON(`https://data.ex.co.kr/openapi/odtraffic/trafficAmountByRealtime?key=${EX_KEY}&type=json&numOfRows=9999&pageNo=1`, {}, 40000);
+    const cz = {};
+    for (const x of d.list) {        // 검지기(VDS) 값을 소통 구간(콘존)별로 평균
+      const c = cz[x.conzoneId] || (cz[x.conzoneId] = { id: x.conzoneId, name: x.conzoneName.replace(/\s+/g, ''), line: x.routeName, n: 0, s: 0, gs: 0 });
+      const sp = +x.speed, g = +x.grade; if (sp > 0 && g > 0) { c.n++; c.s += sp; c.gs += g; }
+    }
+    TR.list = Object.values(cz).filter(c => c.n).map(c => Object.assign(c, { sp: Math.round(c.s / c.n), g: Math.round(c.gs / c.n), xy: EX.cz[c.id] || null }));
+    const f = d.list[0]; TR.std = f && f.stdHour ? `${f.stdHour.slice(0, 2)}:${f.stdHour.slice(2)}` : hhmm(); TR.at = Date.now(); TR.err = false;
+    log('Traffic', `고속도로 소통 정보 ${TR.list.length}개 구간 (기준 ${TR.std}) · 정체 ${TR.list.filter(c => c.g === 3).length} · 서행 ${TR.list.filter(c => c.g === 2).length}`);
+    A.routes.forEach(mapTraffic); if (!A.trip && !A.picked) recommend(); drawRoutes(); if (!A.trip) render();
+  } catch (e) { TR.err = true; log('Traffic', '고속도로 소통 정보를 받지 못했습니다'); if (A.tab === 'traffic') render(); }
+  finally { TR.loading = false; }
+}
+/* 경로가 지나는 소통 구간을 찾아 구간 속도를 입힌다. 구간의 시작·끝 지점이 모두 경로 가까이에, 진행 순서대로 있어야 한다(반대 방향 구간은 순서가 뒤집혀 제외된다). */
+function mapTraffic(r) {
+  r.tf = [];
+  if (TR.list.length) {
+    if (!r.bb) { r.bb = [180, 90, -180, -90]; for (const c of r.c) { r.bb[0] = Math.min(r.bb[0], c[0]); r.bb[1] = Math.min(r.bb[1], c[1]); r.bb[2] = Math.max(r.bb[2], c[0]); r.bb[3] = Math.max(r.bb[3], c[1]); } }
+    const b = r.bb, segs = [], inside = (x, y) => x > b[0] - 0.02 && x < b[2] + 0.02 && y > b[1] - 0.02 && y < b[3] + 0.02;
+    for (const c of TR.list) {
+      const q = c.xy; if (!q || !inside(q[0], q[1]) || !inside(q[2], q[3])) continue;
+      const p0 = project(r, [q[0], q[1]]); if (p0.d > 1500) continue;
+      const p1 = project(r, [q[2], q[3]]); if (p1.d > 1500) continue;
+      const L = p1.m - p0.m;
+      // ponytail: 고속도로와 1.5km 안에서 나란히 가는 빠른 국도는 잘못 맞을 수 있다. 도로 종류 정보가 생기면 그것으로 거른다.
+      if (L < 300 || L > dist([q[0], q[1]], [q[2], q[3]]) * 2 + 1500 || speedAt(r, (p0.m + p1.m) / 2) < 70) continue;
+      segs.push({ a: p0.m, b: p1.m, sp: clamp(c.sp, 5, 120), g: c.g, name: c.name, line: c.line });
+    }
+    segs.sort((x, y) => x.a - y.a); for (let i = 0; i + 1 < segs.length; i++) segs[i].b = Math.min(segs[i].b, segs[i + 1].a);
+    r.tf = segs.filter(x => x.b - x.a > 50);
+  }
+  r.eta = travel(r); r.jam = r.tf.filter(x => x.g === 3).length; r.slow = r.tf.filter(x => x.g === 2).length;
+}
+function travel(r, m0 = 0) {       // m0 지점부터 도착까지 예상 시간(초): 소통 구간은 실시간 속도, 나머지는 기본 주행 시간
+  let t = (r.cumT[r.cumT.length - 1] - tAt(r, m0)) * r.kt;
+  for (const x of r.tf) { const a = Math.max(x.a, m0); if (x.b > a) t += (x.b - a) * 3.6 / x.sp - (tAt(r, x.b) - tAt(r, a)) * r.kt; }
+  return Math.max(0, t);
+}
+const flowAt = (r, m) => { const x = r.tf.find(y => m >= y.a && m < y.b); return x ? Math.min(x.sp, 110) : speedAt(r, m); };
+function bestRoute() { let b = 0; A.routes.forEach((r, i) => { if (r.eta < A.routes[b].eta - 1) b = i; }); return b; }
+function recommend() { const b = bestRoute(); if (A.routes.length && b !== A.ri) { A.ri = b; A.viewed.clear(); ensureOSM(route()); log('App', `실시간 교통을 반영해 경로 ${b + 1}을 추천`); } }
+function restsOn(r) {              // 고속도로 구간에서 진행 방향 오른쪽에 있는 휴게소
+  const out = [];
+  for (const [name, lon, lat] of EX.rests) {
+    const pr = project(r, [lon, lat]); if (pr.d > 400 || speedAt(r, pr.m) < 70) continue;
+    const p = posAt(r, pr.m), h = rad(headAt(r, pr.m));
+    if ((lon - p[0]) * Math.cos(rad(lat)) * Math.cos(h) - (lat - p[1]) * Math.sin(h) > 0) out.push({ m: pr.m, name });
+  }
+  return out.sort((a, b) => a.m - b.m);
+}
+
+/* ================= vehicle + app state ================= */
+const V = { gear: 'P', cruise: 'OFF', target: 100, brake: 0, steer: 0, signal: 'OFF', wiper: 'OFF', light: 'OFF', m: 0, speed: 0, simT: 0, scale: 1 };
+const A = { tab: 'home', origin: DEF, dest: null, sel: null, results: null, routes: [], ri: 0, busy: null, err: null, trip: null, viewed: new Set(), sim: null, queue: [],
+  checkin: null, lastTrip: null, card: null, mine: false, picked: false, starting: false, noBrief: false, confirmReset: false, mute: false, demo: null, collapsed: false, console: innerWidth >= 1100, fix: null, watch: null };
+const isRain = () => V.wiper !== 'OFF';
+const isNight = () => V.light === 'LOW';
+const env = () => ({ rain: isRain(), night: isNight() });
+const route = () => A.routes[A.ri] || null;
+const ptOf = h => h && h.pid ? DB.points.find(p => p.id === h.pid) : null;
+function zone() {                  // 지금 지나고 있는 유의지점 구간(안내 지점 ~ 통과 후 100m) 중 가장 가까운 것
+  const r = route(); if (!A.trip || !r) return null; let best = null;
+  for (const h of r.hz) if (h.tpl !== 'cam' && V.m >= h.m - AHEAD && V.m <= h.m + 100 && (!best || Math.abs(h.m - V.m) < Math.abs(best.m - V.m))) best = h;
+  return best;
+}
+const freq = d => !!d && (DB.hist.some(x => x.n >= 2 && near(x, d)) || ['home', 'work'].some(k => DB.fav[k] && near(DB.fav[k], d)));
+const CRUISE_KO = { OFF: '크루즈 꺼짐', ENABLED: '크루즈 대기', ACTIVATED: '크루즈 작동 중', USER_OVERRIDE: '운전자 개입 중', SUSPENDED: '크루즈 일시 해제', FORCED_DEACTIVATION_WARNING: '강제 해제 경고' };
+
+const logs = [];
+function log(tag, msg) {
+  logs.push(`<span class="t">${hhmm()}</span> <b>${esc(tag)}</b> ${esc(msg)}`); if (logs.length > 150) logs.shift();
+  const el = $('#log'); el.innerHTML = logs.join('<br>'); el.scrollTop = el.scrollHeight;
+}
+let toastTimer, voiceTimer;
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3400); }
+function speak(text, pri, strong) {       // pri: 진행 중인 음성을 끊고 바로 말한다(유의지점·체크인). 그 밖의 안내는 말하는 중이면 생략.
+  log('TTS', text);
+  const el = $('#voice'); el.className = 'voice' + (strong ? ' strong' : '');
+  el.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:2px"><path d="M4 9v6h4l5 4V5L8 9H4ZM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg><span>${esc(text)}</span>`; el.hidden = false;
+  clearTimeout(voiceTimer); voiceTimer = setTimeout(() => { el.hidden = true; }, 7500);
+  try {
+    if (A.mute || !('speechSynthesis' in window)) return;
+    const ss = speechSynthesis; if (!pri && (ss.speaking || ss.pending)) return; if (pri) ss.cancel();
+    const u = new SpeechSynthesisUtterance(text), v = ss.getVoices().find(x => /^ko/i.test(x.lang)); u.lang = 'ko-KR'; if (v) u.voice = v; u.rate = 1.05;
+    setTimeout(() => ss.speak(u), pri ? 80 : 0);
+  } catch (e) { /* voice output unavailable */ }
+}
+
+/* ---------- cruise state machine (vehicle side) + intervention detection (app side) ---------- */
+const inputs = []; let lastRecAt = 0;
+function setCruise(next) {
+  const prev = V.cruise; if (prev === next) return; V.cruise = next;
+  log('Vehicle', `onCruiseControlStateUpdated(${next})`); onCruiseChange(prev, next); syncConsole();
+}
+function vehicleRules() {
+  if ((V.cruise === 'ACTIVATED' || V.cruise === 'USER_OVERRIDE') && V.brake > 5) setCruise('SUSPENDED');
+  else if (V.cruise === 'ACTIVATED' && Math.abs(V.steer) > 20) setCruise('USER_OVERRIDE');
+  else if (V.cruise === 'USER_OVERRIDE' && Math.abs(V.steer) < 5) setCruise('ACTIVATED');
+}
+function snapshot() {
+  const r = route(), p = posAt(r, V.m);
+  return { m: Math.round(V.m), lat: +p[1].toFixed(5), lon: +p[0].toFixed(5), heading: Math.round(headAt(r, V.m)), signal: V.signal, wiper: V.wiper, light: V.light, target: V.target, speed: Math.round(V.speed), rain: isRain(), night: isNight() };
+}
+function onCruiseChange(prev, next) {
+  const T = A.trip; if (!T || T.arrived) return;
+  if (next === 'ACTIVATED') T.cruiseSince = V.simT;
+  if (prev !== 'ACTIVATED' || next === 'ACTIVATED') return;
+  const snap = snapshot();
+  if (next === 'FORCED_DEACTIVATION_WARNING') { record('system', snap); return; }
+  const t0 = performance.now();
+  setTimeout(() => {                      // 상태 전환 전후 2초의 브레이크·조향 입력 확인
+    const w = inputs.filter(i => i.t >= t0 - 2000 && i.t <= t0 + 2100);
+    const maxB = Math.max(0, ...w.map(i => i.b)), ss = w.map(i => i.s);
+    const dS = ss.length ? Math.max(...ss) - Math.min(...ss) : 0;
+    if (maxB > 5 || dS > 15) record('driver', Object.assign(snap, { brake: Math.round(maxB), steer: Math.round(dS), by: maxB > 5 ? 'brake' : 'steer' }));
+    else log('App', '버튼으로 크루즈 해제: 페달·조향 입력 없음 → 기록 제외');
+  }, 2100);
+}
+const STEP_TPL = { merge: 'merge', 'on ramp': 'merge', fork: 'diverge', 'off ramp': 'diverge', turn: 'left', 'end of road': 'left' };
+function record(kind, snap) {
+  const T = A.trip, r = route(); if (!T || !r) return;
+  const now = performance.now(); if (now - lastRecAt < 4000) return; lastRecAt = now;
+  if (snap.m < 500 || snap.m > r.len - 500) { log('App', '출발지·목적지 반경 500m 안: 개인정보 보호를 위해 저장하지 않음'); return; }
+  // 300m 안의 가장 가까운 유의지점에, 없으면 안내 중인 유의지점에 귀속. 둘 다 없으면 새 지점.
+  const h = r.hz.filter(x => x.tpl !== 'cam' && Math.abs(x.m - snap.m) <= 300).sort((a, b) => Math.abs(a.m - snap.m) - Math.abs(b.m - snap.m))[0] || zone();
+  let tpl, name, lon, lat;
+  if (h) { tpl = h.tpl; name = h.name; lon = h.lon; lat = h.lat; }
+  else {
+    const s = r.steps.find(x => STEP_TPL[x.type] && Math.abs(x.m - snap.m) <= 300), road = (r.steps.filter(x => x.m <= snap.m && x.name).pop() || {}).name;
+    tpl = s ? STEP_TPL[s.type] : snap.by === 'steer' ? 'curve' : 'merge'; name = `${road ? road + ' ' : ''}${TPL[tpl].short}`; lon = snap.lon; lat = snap.lat;
+  }
+  let p = ptOf(h) || DB.points.find(x => dist([x.lon, x.lat], [lon, lat]) < 150);
+  const ev = Object.assign({ id: 'e' + Date.now().toString(36), ts: Date.now(), clock: hhmm(), kind, tpl, place: name, shared: S.share }, snap);
+  log('App', `개입 기록: ${kind === 'system' ? '시스템 해제' : kind === 'voice' ? '음성 신고' : snap.by === 'steer' ? '운전자 조향' : '운전자 제동'} @ ${snap.lat}, ${snap.lon} · ${name}`);
+  if (S.share) {
+    if (p) { p.hit++; if (!p.mine) p.veh++; p.mine = (p.mine || 0) + 1; if (snap.rain) p.rh++; if (snap.night) p.nh++; }
+    else { p = { id: 'u' + Date.now().toString(36), lat, lon, name, tpl, pass: 1, hit: 1, veh: 1, rp: snap.rain ? 1 : 0, rh: snap.rain ? 1 : 0, np: snap.night ? 1 : 0, nh: snap.night ? 1 : 0, mine: 1 }; DB.points.push(p); }
+    if (h) h.pid = p.id;
+    log('Server', `집계 반영: ${p.name} · 개입 ${p.hit}건 / 차량 ${p.veh}대${isPublic(p) ? '' : ' (5대 미만: 비공개 집계 중)'}`);
+  } else log('App', '데이터 공유 꺼짐: 이 차량에만 저장');
+  T.events.push(ev); DB.events.push(ev);
+  if (h && (kind === 'system' || (snap.brake || 0) >= 70)) T.hard[h.id] = true;
+  save();
+}
+
+/* ---------- destination, route ---------- */
+async function loadRoutes() {
+  A.routes = []; A.ri = 0; A.picked = false; A.err = null; A.results = null; A.busy = '경로를 찾는 중입니다…'; A.tab = 'home'; A.collapsed = false; A.viewed.clear(); drawRoutes(); render();
+  try {
+    const rs = await fetchRoutes([A.origin, A.dest]);
+    rs.forEach(r => { r.raw = detectLocal(r); finalize(r); });
+    A.routes = rs; A.busy = null; A.ri = bestRoute();
+    const r = route(), osm = ensureOSM(r);
+    log('NaviHelper', `onRouteStarted(${A.dest.name}, ${fmtDist(r.len)}) · onTripInfo`);
+    log('App', `경로 ${rs.length}개 · 유의지점 ${r.hz.length}곳 추출${r.tf.length ? ` · 고속도로 소통 구간 ${r.tf.length}개 반영` : ''}`);
+    drawRoutes(); fit(r); render(); loadTraffic();
+    if (freq(A.dest) && !A.noBrief) Promise.race([osm, sleep(7000)]).then(() => { if (route() === r && !A.trip && !A.sim && !A.demo && !A.starting && r.hz.some(h => !TPL[h.tpl].nosim)) { toast('자주 가는 길입니다. 유의지점 시뮬레이션을 재생합니다'); ACT.playAll(); } });
+  } catch (e) { A.busy = null; A.err = '경로를 찾지 못했습니다. 인터넷 연결을 확인하거나 다른 목적지를 골라 주세요.'; render(); }
+}
+function goTo(place) { A.dest = place; A.sel = null; $('#q').value = place.name; $('#btnClear').hidden = false; drawSel(); return loadRoutes(); }
+function selectPlace(p) { A.sel = p; A.results = null; A.tab = 'home'; A.collapsed = false; drawSel(); map.easeTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 14.5) }); render(); }
+function bump(d) {
+  let h = DB.hist.find(x => near(x, d)); if (!h) { h = { name: d.name, sub: d.sub || '', lat: d.lat, lon: d.lon, n: 0 }; DB.hist.push(h); }
+  h.n++; h.last = Date.now(); DB.hist.sort((a, b) => b.last - a.last); DB.hist.length = Math.min(DB.hist.length, 20); save();
+}
+const getPos = () => new Promise(res => {
+  if (!navigator.geolocation) return res(null);
+  navigator.geolocation.getCurrentPosition(p => res(p.coords), () => res(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
+});
+function watchGps() { if (A.watch == null && navigator.geolocation) A.watch = navigator.geolocation.watchPosition(p => onFix(p.coords), () => {}, { enableHighAccuracy: true, maximumAge: 1000 }); }
+function hereFrom(c) { A.origin = { name: '현재 위치', sub: '', lat: c.latitude, lon: c.longitude, gps: true }; A.fix = { lat: c.latitude, lon: c.longitude, speed: 0, t: Date.now() }; drawMe(); watchGps(); }
+async function locate(silent) {     // silent: 앱을 열 때 조용히 시도. 실패해도 기본 출발지를 그대로 쓴다.
+  if (!navigator.geolocation) { if (!silent) toast('이 브라우저는 위치 기능을 지원하지 않습니다'); return; }
+  if (!silent) toast('현재 위치를 확인하는 중입니다');
+  const c = await getPos();
+  if (!c) { if (!silent) toast('위치를 가져오지 못했습니다. 위치 권한을 확인해 주세요. 출발지는 검색이나 지도에서도 정할 수 있습니다.'); return; }
+  if (A.trip) return;
+  hereFrom(c); log('FusedLocation', `LocationData ${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`);
+  if (!route() || !silent) map.easeTo({ center: [c.longitude, c.latitude], zoom: 15 });
+  if (A.dest && !silent) loadRoutes(); else render();
+}
+let wake = null;                    // 주행 중 화면이 꺼지지 않게 한다
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); }
+    else if (!on && wake) { await wake.release(); wake = null; }
+  } catch (e) { /* not supported or denied */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && A.trip) keepAwake(true); });
+function prime() { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* no speech */ } }   // 모바일은 터치 직후에 한 번 말해야 음성이 풀린다
+function onFix(c) {
+  const prev = A.fix, now = Date.now(), lon = c.longitude, lat = c.latitude;
+  const sp = c.speed != null && c.speed >= 0 ? c.speed * 3.6 : prev && now > prev.t ? dist([prev.lon, prev.lat], [lon, lat]) / ((now - prev.t) / 1000) * 3.6 : 0;
+  A.fix = { lon, lat, speed: sp, t: now }; drawMe();
+  if (A.origin.gps && !A.trip) { A.origin.lat = lat; A.origin.lon = lon; }
+  const T = A.trip, r = route(); if (!T || T.mock || T.arrived || !r) return;
+  if (project(r, [lon, lat]).d > 70) { if (++T.off >= 4 && !T.rerouting) reroute(); } else T.off = 0;
+}
+async function reroute() {
+  const T = A.trip; T.rerouting = true; speak('경로를 벗어났습니다. 경로를 다시 탐색합니다.'); log('NaviHelper', '경로 이탈 → 재탐색');
+  try {
+    A.origin = { name: '현재 위치', sub: '', lat: A.fix.lat, lon: A.fix.lon, gps: true };
+    const r = (await fetchRoutes([A.origin, A.dest]))[0]; r.raw = detectLocal(r); finalize(r);
+    if (A.trip !== T) return;
+    A.routes = [r]; A.ri = 0; V.m = 0; T.off = 0; A.card = null; drawRoutes(); ensureOSM(r);
+  } catch (e) { toast('경로를 다시 찾지 못했습니다'); } finally { T.rerouting = false; }
+}
+
+/* ---------- trip lifecycle ---------- */
+function startTrip(mock) {
+  const r = route(); if (!r) return toast('목적지를 먼저 정해 주세요');
+  if (A.trip) return;
+  if (!mock && !(A.origin.gps && navigator.geolocation)) { mock = true; toast('현재 위치를 쓰지 않아 모의 주행으로 안내합니다'); }
+  if (A.sim) { closeSim(); log('App', 'stopPlayingVideo(): 주행 규제로 시뮬레이션 종료'); }
+  V.m = 0; V.speed = 0; V.gear = 'D'; A.card = null; A.checkin = null;
+  A.trip = { mock, cruiseSec: 0, cruiseSince: null, events: [], ann: {}, ready: [], hard: {}, checkins: [], silent: 0, waypoint: null, arrived: false, rain: isRain(), night: isNight(), off: 0, dest: A.dest.name };
+  bump(A.dest);
+  log('Vehicle', 'Gear P → D'); log('UX', 'CarUxRestrictions 활성: UX_RESTRICTIONS_NO_VIDEO');
+  log('App', `${mock ? '모의 주행으로' : '실제 위치(GPS)로'} 안내 시작 · 유의지점 ${r.hz.length}곳`);
+  if (!mock) watchGps();
+  keepAwake(true); $('#hudTop').appendChild($('#voice')); drawCar(); render();
+  speak(`${A.dest.name}까지 경로 안내를 시작합니다.`, true);
+}
+function endTrip() {
+  const T = A.trip; if (!T) return;
+  T.arrived = true; if (V.cruise !== 'OFF') setCruise('OFF');
+  keepAwake(false); V.gear = 'P'; V.brake = 0; V.speed = 0; A.checkin = null; A.card = null; unslow();
+  log('Vehicle', 'Gear D → P'); log('UX', 'CarUxRestrictions 해제: 정차 전용 화면 사용 가능');
+  if (V.m > 300) {
+    const ok = T.ready.filter(x => x.ok).length;
+    const rep = { day: dayKey(), routeName: T.dest, cruiseMin: Math.round(T.cruiseSec / 60), km: +(V.m / 1000).toFixed(1), events: T.events.length, evs: T.events.slice(), ready: [ok, T.ready.length], readyList: T.ready.slice(), silent: T.silent, rain: T.rain, night: T.night, shared: T.events.filter(e => e.shared).length, waypoint: T.waypoint };
+    DB.trips.push(rep); A.lastTrip = rep; A.tab = 'report'; save();
+    log('App', `주행 종료: 크루즈 ${rep.cruiseMin}분 · 개입 ${rep.events}회 · 준비 점수 ${ok}/${T.ready.length}`);
+    A.dest = null; A.routes = []; $('#q').value = ''; $('#btnClear').hidden = true;
+  } else toast('주행을 취소했습니다');
+  A.trip = null; V.m = 0; document.body.appendChild($('#voice'));
+  if (MK.car) { MK.car.remove(); MK.car = null; }
+  map.easeTo({ pitch: 0, bearing: 0, zoom: Math.min(map.getZoom(), 14), duration: 600 }); drawRoutes(); render();
+}
+function cruiseOn() {
+  const T = A.trip; if (!T || T.arrived) return toast('크루즈는 주행 중에 켤 수 있습니다');
+  if (V.brake > 0) return toast('브레이크를 뗀 뒤 크루즈를 켜세요');
+  setCruise('ACTIVATED');
+}
+function setBrake(n) { V.brake = clamp(+n, 0, 100); const z = zone(); if (z && V.brake >= 70) A.trip.hard[z.id] = true; vehicleRules(); syncConsole(); }
+
+/* ---------- 턴바이턴 안내 ---------- */
+const MOD = { left: '좌회전', right: '우회전', 'slight left': '왼쪽 방향', 'slight right': '오른쪽 방향', 'sharp left': '크게 좌회전', 'sharp right': '크게 우회전', uturn: '유턴', straight: '직진' };
+const ROT = { straight: 0, 'slight right': 40, right: 90, 'sharp right': 135, uturn: 180, 'slight left': -40, left: -90, 'sharp left': -135 };
+function instr(s) {
+  const side = /left/.test(s.mod) ? '왼쪽 ' : /right/.test(s.mod) ? '오른쪽 ' : '';
+  switch (s.type) {
+    case 'arrive': return '목적지';
+    case 'merge': return '본선 합류';
+    case 'on ramp': return side + '진입로';
+    case 'off ramp': return side + '출구';
+    case 'fork': return side + '갈림길';
+    case 'roundabout': case 'rotary': return `회전교차로${s.exit ? ` ${s.exit}번째 출구` : ''}`;
+    default: return MOD[s.mod] || '직진';
+  }
+}
+const major = s => !(s.type === 'depart' || /^exit r/.test(s.type) || (['new name', 'continue', 'notification', 'turn'].includes(s.type) && (!s.mod || s.mod === 'straight')));
+
+/* ---------- proximity, announcements, check-in ---------- */
+let slowTimer;
+function slow() { if (A.trip && A.trip.mock && V.scale > 1) { A.scaleBackup = A.scaleBackup || V.scale; V.scale = 1; log('Sim', '음성 안내 중: 재생을 잠시 1×로 전환'); syncConsole(); clearTimeout(slowTimer); slowTimer = setTimeout(unslow, 6500); } }
+function unslow() { clearTimeout(slowTimer); if (A.scaleBackup) { V.scale = A.scaleBackup; A.scaleBackup = null; syncConsole(); } }
+const crossed = (a, b, k) => a < k && b >= k;
+function checks(prev, now) {
+  const T = A.trip, r = route(), cruising = V.cruise === 'ACTIVATED';
+  r.steps.forEach((s, i) => {
+    if (!i || !major(s)) return;
+    if (crossed(prev, now, s.m - 300) && s.m > 350) speak(`300미터 앞 ${instr(s)}입니다.`);
+    if (s.type !== 'arrive' && crossed(prev, now, s.m - 70)) speak(`잠시 후 ${instr(s)}입니다.`);
+  });
+  for (const h of r.hz) {
+    if (h.tpl !== 'cam' && crossed(prev, now, h.m - 1000) && S.checkin && cruising && !T.ann[h.id] && T.cruiseSince != null && (V.simT - T.cruiseSince) / 60 >= S.cmin) startCheckin(h);
+    if (crossed(prev, now, Math.max(1, h.m - AHEAD))) {
+      log('FusedLocation', `ProximityAlert ENTER · ${h.name} (반경 ${AHEAD}m)`);
+      if (S.cruiseOnly && !cruising) { T.silent++; log('App', '크루즈 미작동: 설정에 따라 안내하지 않음'); continue; }
+      const a = T.ann[h.id] = T.ann[h.id] || { checkin: false }; if (a.said) continue; a.said = true;
+      const d = clamp(Math.ceil((h.m - now) / 50) * 50, 50, AHEAD);
+      if (!A.checkin) A.card = { cls: 'warn', hid: h.id, short: TPL[h.tpl].short, sub: h.name === TPL[h.tpl].short ? '운전에 주의하세요' : h.name };
+      if (S.voice) { speak(`전방 ${d}미터 앞 ${h.name}입니다. 운전에 주의하세요.`, true); slow(); } else log('App', '음성 안내 꺼짐: 화면 카드만 표시');
+    }
+    if (crossed(prev, now, h.m - 150) && cruising && S.share) { const p = ptOf(h); if (p) { p.pass++; if (isRain()) p.rp++; if (isNight()) p.np++; } }
+    if (crossed(prev, now, h.m + 100)) {
+      log('FusedLocation', `ProximityAlert EXIT · ${h.name}`);
+      if (T.ann[h.id] && h.tpl !== 'cam') T.ready.push({ id: h.id, name: h.name, ok: !T.hard[h.id], checkin: T.ann[h.id].checkin });
+      if (A.card && A.card.hid === h.id) A.card = null;
+    }
+  }
+  for (const x of r.tf) if (x.g === 3 && x.a > 2500 && crossed(prev, now, x.a - 2000)) speak(`약 2킬로미터 앞 ${x.name.replace('-', '에서 ')} 구간이 정체입니다. 평균 시속 ${x.sp}킬로미터입니다.`);
+  if (T.waypoint && crossed(prev, now, T.waypoint.m - 300)) speak(`${T.waypoint.name}입니다. 잠시 쉬어 가세요.`, true);
+}
+function startCheckin(h) {
+  slow(); A.checkin = { hid: h.id, stage: 1, until: performance.now() + 8000, t0: performance.now() };
+  log('App', `단조 주행 ${Math.round((V.simT - A.trip.cruiseSince) / 60)}분: 음성 체크인 시작`);
+  speak(`곧 ${TPL[h.tpl].short}입니다. 준비되셨으면 준비라고 말씀해 주세요.`, true);
+  log('SpeechToText', '음성 응답 대기'); A.card = { cls: 'ask', text: '“준비”라고 말씀해 주세요', sub: `1km 앞 · ${h.name}` };
+}
+function checkinTick() {
+  const c = A.checkin; if (!c || performance.now() < c.until) return;
+  const T = A.trip, r = route();
+  if (c.stage === 1) {
+    c.stage = 2; c.until = performance.now() + 9000; c.rest = T.waypoint ? null : r.rests.find(x => x.m > V.m + 500) || null;
+    log('App', '응답 없음: 안내를 한 단계 높임');
+    speak(`응답이 없습니다. 전방을 주시해 주세요.${c.rest ? ` 약 ${fmtDist(c.rest.m - V.m).replace('km', '킬로미터').replace('m', '미터')} 앞 ${c.rest.name}를 경유지로 추가할까요?` : ''}`, true, true);
+    A.card = { cls: 'warn', text: c.rest ? `${c.rest.name}를 경유지로 추가할까요?` : '전방을 주시해 주세요', sub: c.rest ? '“네”라고 답하면 추가합니다' : '' };
+  } else { T.checkins.push({ hid: c.hid, ok: false }); A.checkin = null; if (A.card && !A.card.hid) A.card = null; log('App', `체크인 무응답으로 종료: ${AHEAD}m 앞에서 다시 안내`); }
+}
+function onVoice(w) {
+  log('SpeechToText', `인식 결과: “${w === '위험' ? '여기 위험해' : w}”`);
+  const T = A.trip, c = A.checkin;
+  if (w === '위험') { if (!T || T.arrived) return toast('주행 중에 사용할 수 있습니다'); record('voice', snapshot()); return speak('이 지점을 위험 지점으로 기록했습니다.', true); }
+  if (!c) return toast('지금은 음성 응답을 기다리고 있지 않습니다');
+  if (w === '준비') {
+    T.ann[c.hid] = Object.assign(T.ann[c.hid] || {}, { checkin: true }); T.checkins.push({ hid: c.hid, ok: true, sec: +((performance.now() - c.t0) / 1000).toFixed(1) });
+    T.cruiseSince = V.simT;   // 응답을 받았으므로 단조 주행 시간을 다시 센다
+    A.checkin = null; A.card = { cls: 'ok', text: '확인했습니다', sub: '준비 상태로 통과합니다' }; speak('확인했습니다.', true);
+  } else if (w === '네' && c.stage === 2 && c.rest) {
+    T.waypoint = c.rest; T.checkins.push({ hid: c.hid, ok: false, rest: true });
+    A.checkin = null; A.card = { cls: 'ok', text: `${c.rest.name} 경유지 추가`, sub: '도착하면 알려 드립니다' };
+    log('NaviHelper', `addWaypoint(${c.rest.name})`); speak(`${c.rest.name}를 경유지로 추가했습니다.`, true);
+  }
+}
+function addOthers() {
+  const pend = DB.points.filter(p => !isPublic(p)); if (!pend.length) return toast('집계 중인 비공개 지점이 없습니다. 먼저 주행 중에 개입을 기록해 보세요.');
+  for (const p of pend) { p.veh += 2; p.hit += 2; p.pass += 9; log('Server', `${p.name}: 차량 ${p.veh}대 · 개입률 ${per100(rate(p))}%${isPublic(p) ? ' → 유의지점으로 공개' : ''}`); }
+  save(); render(); toast('다른 차량 2대의 개입 기록을 반영했습니다(시뮬레이션)');
+}
+
+/* ---------- main loop ---------- */
+let lastTick = performance.now();
+function tick() {
+  const t = performance.now(), real = Math.min(1, (t - lastTick) / 1000); lastTick = t;
+  inputs.push({ t, b: V.brake, s: V.steer }); if (inputs.length > 120) inputs.shift();
+  vehicleRules();
+  const T = A.trip, r = route();
+  if (T && r && !T.arrived) {
+    const dt = real * (T.mock ? V.scale : 1), prev = V.m; let atDest = false;
+    if (T.mock) {
+      const lim = flowAt(r, V.m), want = (V.cruise === 'ACTIVATED' || V.cruise === 'USER_OVERRIDE') ? Math.min(V.target, lim) : lim;   // 크루즈는 도로 흐름 속도를 넘지 않는 것으로 가정
+      if (V.brake > 0) V.speed = Math.max(0, V.speed - V.brake * 0.08 * 3.6 * dt);
+      else if (V.speed < want) V.speed = Math.min(want, V.speed + 7 * dt);
+      else V.speed = Math.max(want, V.speed - 9 * dt);
+      V.m = Math.min(r.len, V.m + V.speed / 3.6 * dt);
+    } else if (A.fix && !T.rerouting) {
+      const pr = project(r, [A.fix.lon, A.fix.lat]); if (pr.d < 70 && pr.m > V.m) V.m = pr.m; V.speed = A.fix.speed;
+      atDest = dist([A.fix.lon, A.fix.lat], [A.dest.lon, A.dest.lat]) < 40;       // 경로 끝이 아니어도 목적지 근처면 도착
+    }
+    V.simT += dt; if (V.cruise === 'ACTIVATED') T.cruiseSec += dt;
+    if (V.m > prev && V.m - prev < 2000) checks(prev, V.m);     // 위치가 한 번에 크게 뛰면(GPS 끊김) 지나친 지점은 안내하지 않는다
+    checkinTick();
+    if (V.m >= r.len - 25 || atDest) {
+      T.arrived = true; V.speed = 0; if (V.cruise !== 'OFF') setCruise('OFF'); unslow(); A.checkin = null;
+      log('NaviHelper', 'onDestinationArrived'); A.card = { cls: 'ok', text: '목적지에 도착했습니다', sub: '‘안내 종료’를 누르면 주행 리포트가 열립니다' };
+      speak('목적지에 도착했습니다. 주차하면 오늘의 주행 리포트를 보여 드립니다.', true);
+    }
+  }
+  live();
+}
+
+/* ================= simulation player (정차 전용) ================= */
+const C = { ground: '#3E4B47', asphalt: '#2B323D', line: '#E9EEF4', yellow: '#F2C230', ego: '#3D7BFF', car: '#A7B1BF', truck: '#D8A04A', hill: '#2B3633' };
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function road(c, y0, y1, dashes, center) {
+  c.fillStyle = C.asphalt; c.fillRect(0, y0, 160, y1 - y0); c.strokeStyle = C.line; c.lineWidth = 0.5; c.setLineDash([]);
+  c.beginPath(); c.moveTo(0, y0 + 0.6); c.lineTo(160, y0 + 0.6); c.moveTo(0, y1 - 0.6); c.lineTo(160, y1 - 0.6); c.stroke();
+  c.setLineDash([5, 5]); for (const y of dashes || []) { c.beginPath(); c.moveTo(0, y); c.lineTo(160, y); c.stroke(); }
+  c.setLineDash([]); if (center != null) { c.strokeStyle = C.yellow; c.lineWidth = 0.7; c.beginPath(); c.moveTo(0, center); c.lineTo(160, center); c.stroke(); }
+}
+function poly(c, pts, fill) { c.fillStyle = fill; c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fill(); }
+function drawActor(c, a) {
+  const truck = a.k === 'truck', L = truck ? 22 : 12, W = truck ? 6.6 : 5.6;
+  c.save(); c.translate(a.x, a.y); c.rotate(a.rot * Math.PI / 180);
+  if (a.k === 'child') { c.fillStyle = '#FFD23F'; c.beginPath(); c.arc(0, 0, 1.7, 0, 7); c.fill(); c.fillStyle = '#3A2A1A'; c.beginPath(); c.arc(0, 0, 0.8, 0, 7); c.fill(); c.restore(); return; }
+  c.fillStyle = 'rgba(0,0,0,.28)'; rr(c, -L / 2 + 0.7, -W / 2 + 0.9, L, W, 1.4); c.fill();
+  c.fillStyle = a.c || (a.k === 'ego' ? C.ego : truck ? C.truck : C.car); rr(c, -L / 2, -W / 2, L, W, 1.5); c.fill();
+  if (truck) { c.fillStyle = '#EEF1F5'; rr(c, -L / 2 + 0.8, -W / 2 + 0.6, L - 7.5, W - 1.2, 0.8); c.fill(); c.fillStyle = '#243042'; rr(c, L / 2 - 4.6, -W / 2 + 0.9, 1.8, W - 1.8, 0.5); c.fill(); }
+  else { c.fillStyle = 'rgba(14,22,36,.78)'; rr(c, L / 2 - 5, -W / 2 + 0.8, 2.4, W - 1.6, 0.6); c.fill(); rr(c, -L / 2 + 1.6, -W / 2 + 0.9, 1.7, W - 1.8, 0.5); c.fill(); }
+  c.fillStyle = a.brake ? '#FF3B3B' : '#7A1C24'; c.fillRect(-L / 2 - 0.1, -W / 2 + 0.5, 1, 1.5); c.fillRect(-L / 2 - 0.1, W / 2 - 2, 1, 1.5);
+  if (a.brake) { c.fillStyle = 'rgba(255,60,60,.28)'; c.beginPath(); c.arc(-L / 2, 0, 4.2, 0, 7); c.fill(); }
+  c.restore();
+}
+function kfAt(kf, t) {
+  let i = 0; while (i < kf.length - 1 && kf[i + 1][0] <= t) i++;
+  const a = kf[i], b = kf[Math.min(i + 1, kf.length - 1)], f = b[0] > a[0] ? clamp((t - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+  return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, rot: (a[3] || 0) + ((b[3] || 0) - (a[3] || 0)) * f, brake: !!a[4] };
+}
+const bez = (s) => { const P = [[0, 74], [70, 74], [118, 62], [128, 6]], u = 1 - s;
+  const x = u * u * u * P[0][0] + 3 * u * u * s * P[1][0] + 3 * u * s * s * P[2][0] + s * s * s * P[3][0], y = u * u * u * P[0][1] + 3 * u * u * s * P[1][1] + 3 * u * s * s * P[2][1] + s * s * s * P[3][1];
+  const dx = 3 * u * u * (P[1][0] - P[0][0]) + 6 * u * s * (P[2][0] - P[1][0]) + 3 * s * s * (P[3][0] - P[2][0]), dy = 3 * u * u * (P[1][1] - P[0][1]) + 6 * u * s * (P[2][1] - P[1][1]) + 3 * s * s * (P[3][1] - P[2][1]);
+  const n = Math.hypot(dx, dy) || 1; return { x, y, nx: -dy / n, ny: dx / n, ang: Math.atan2(dy, dx) * 180 / Math.PI }; };
+function curveKf(ego) {
+  const kf = [];
+  for (let i = 0; i <= 24; i++) {
+    const t = i * 0.5; let s, off, br = 0, yaw = 0;
+    if (ego) { s = t < 7 ? t * 0.085 : 0.595 + (t - 7) * 0.05; const d = clamp((s - 0.36) / 0.22, 0, 1), back = clamp((s - 0.6) / 0.14, 0, 1); off = 4.6 + 4 * d * d * (3 - 2 * d) * (1 - back * back * (3 - 2 * back)); br = t >= 7 ? 1 : 0; yaw = s > 0.4 && s < 0.6 ? 7 : s >= 0.6 && s < 0.72 ? -9 : 0; }
+    else { s = 1 - t * 0.075; off = -4.6; }
+    const b = bez(clamp(s, 0, 1)); kf.push([t, b.x + b.nx * off, b.y + b.ny * off, b.ang + yaw + (ego ? 0 : 180), br]);
+  }
+  return kf;
+}
+const SIMS = {
+  merge: { alert: [7, 9.5], caps: [[0, '크루즈로 주행 중입니다. 우측 합류 차로에서 화물차가 다가옵니다.'], [3.5, '화물차가 내 차 바로 앞으로 끼어듭니다.'], [7, '크루즈의 감속이 늦습니다. 직접 브레이크를 밟아야 합니다.'], [9.5, '이 지점에서는 발을 브레이크 위에 두고 우측 합류 차로를 살피세요.']],
+    bg(c) { poly(c, [[0, 62], [72, 46], [104, 46], [0, 73]], C.asphalt); road(c, 28, 46, [37]); c.strokeStyle = C.line; c.lineWidth = 0.5; c.beginPath(); c.moveTo(0, 72.6); c.lineTo(104, 45.6); c.stroke(); },
+    actors: [{ k: 'car', kf: [[0, 40, 32.5], [12, 190, 32.5]] }, { k: 'truck', kf: [[0, 30, 60.5, -13], [3.5, 62, 52.2, -13], [6, 86, 46.8, -9], [7.5, 98, 42.5, -4, 1], [9, 107, 41.5, 0, 1], [12, 128, 41.5, 0]] }, { k: 'ego', kf: [[0, 8, 41.5], [6, 64, 41.5], [7.5, 76, 41.5], [9, 84, 41.5, 0, 1], [12, 94, 41.5, 0, 1]] }] },
+  diverge: { alert: [6.6, 9], caps: [[0, '분기점 앞, 크루즈로 3차로를 달리고 있습니다.'], [3.5, '1차로 차량이 진출로를 향해 급하게 차로를 가로지릅니다.'], [6.6, '크루즈가 인식하기 전에 직접 속도를 줄여야 합니다.'], [9.2, '분기 직전에는 옆 차로 차량의 움직임을 미리 확인하세요.']],
+    bg(c) { poly(c, [[92, 49], [160, 73], [160, 62], [112, 49]], C.asphalt); road(c, 22, 49, [31, 40]); poly(c, [[112, 49.4], [150, 59], [150, 57.2], [118, 49.4]], C.line); },
+    actors: [{ k: 'car', kf: [[0, 70, 35.5], [12, 185, 35.5]] }, { k: 'car', c: '#C9CED6', kf: [[0, 30, 26.5], [3.5, 62, 26.5], [5.5, 80, 35.5, 22], [7, 95, 44.5, 24], [8.5, 112, 52.5, 20], [12, 150, 64.5, 19]] }, { k: 'ego', kf: [[0, 8, 44.5], [5.5, 66, 44.5], [7, 80, 44.5], [8.5, 88, 44.5, 0, 1], [12, 100, 44.5, 0, 1]] }] },
+  left: { alert: [6.6, 9.5], caps: [[0, '크루즈로 교차로에 다가갑니다. 신호는 녹색입니다.'], [4, '맞은편 차량이 비보호 좌회전을 시작합니다.'], [6.6, '크루즈는 가로지르는 차량에 늦게 반응합니다. 직접 브레이크를 밟아야 합니다.'], [9.6, '비보호 교차로에서는 진입 전에 속도를 줄이세요.']],
+    bg(c) { c.fillStyle = C.asphalt; c.fillRect(85, 0, 30, 90); road(c, 30, 60, [], 45); c.fillStyle = C.asphalt; c.fillRect(85.6, 30.6, 28.8, 28.8); c.fillStyle = C.line; c.fillRect(82, 46, 1, 13.4); c.fillRect(117, 30.6, 1, 13.4); c.fillStyle = '#35D07F'; c.beginPath(); c.arc(120, 64, 1.8, 0, 7); c.fill(); },
+    actors: [{ k: 'car', kf: [[0, 150, 37.5, 180], [4, 122, 37.5, 180], [6, 106, 39.5, 160], [6.8, 100, 45, 130], [7.6, 97, 53, 100], [9, 96, 68, 90], [12, 96, 100, 90]] }, { k: 'ego', kf: [[0, 5, 52.5], [5, 60, 52.5], [6.5, 74, 52.5], [7.5, 80, 52.5, 0, 1], [9.5, 83, 52.5, 0, 1], [12, 112, 52.5, 0]] }] },
+  tunnel: { alert: [6.6, 9.5], caps: [[0, '터널 안을 크루즈로 달리고 있습니다.'], [4.4, '출구를 나서자 눈이 부시고, 바로 앞에 정체 꼬리가 있습니다.'], [6.6, '정지한 차량은 인식이 늦습니다. 직접 브레이크를 밟아야 합니다.'], [9.6, '터널 출구 전에는 속도를 줄이고 전방 정체를 확인하세요.']],
+    bg(c) { poly(c, [[0, 0], [60, 0], [60, 90], [0, 90]], C.hill); road(c, 28, 46, [37]); },
+    fg(c, t) { c.fillStyle = 'rgba(12,15,20,.82)'; c.fillRect(0, 24, 60, 26); c.fillStyle = '#8D97A5'; c.fillRect(59, 23, 2, 28); if (t > 4.2 && t < 6.4) { const g = c.createRadialGradient(64, 37, 1, 64, 37, 46); const a = 0.55 * Math.sin((t - 4.2) / 2.2 * Math.PI); g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 160, 90); } },
+    actors: [[119, 41.5], [134, 41.5], [149, 41.5], [124, 32.5], [140, 32.5], [156, 32.5]].map(([x, y]) => ({ k: 'car', kf: [[0, x, y, 0, 1]] })).concat([{ k: 'ego', kf: [[0, 5, 41.5], [5, 62, 41.5], [7, 84, 41.5], [8, 91, 41.5, 0, 1], [10, 99, 41.5, 0, 1], [12, 101, 41.5, 0, 1]] }]) },
+  curve: { alert: [5.6, 8.6], caps: [[0, '크루즈와 차로 유지로 급커브에 들어섭니다.'], [3.6, '곡률이 커서 차가 바깥쪽으로 밀립니다.'], [5.6, '차로 유지의 한계입니다. 직접 핸들을 돌려야 합니다.'], [8.8, '급커브 전에는 핸들을 잡고 속도를 낮추세요.']],
+    bg(c) { const path = () => { c.beginPath(); c.moveTo(0, 74); c.bezierCurveTo(70, 74, 118, 62, 128, 6); }; c.lineCap = 'butt'; c.setLineDash([]);
+      c.strokeStyle = C.line; c.lineWidth = 19.4; path(); c.stroke(); c.strokeStyle = C.asphalt; c.lineWidth = 18.4; path(); c.stroke();
+      c.strokeStyle = C.yellow; c.lineWidth = 0.7; c.setLineDash([5, 4]); path(); c.stroke(); c.setLineDash([]);
+      c.fillStyle = C.yellow; for (const [x, y, r] of [[112, 84, -30], [128, 74, -50], [138, 58, -68]]) { c.save(); c.translate(x, y); c.rotate(r * Math.PI / 180); c.fillRect(-2.6, -1.6, 5.2, 3.2); c.restore(); } },
+    actors: [{ k: 'car', kf: curveKf(false) }, { k: 'ego', kf: curveKf(true) }] },
+  school: { alert: [6.4, 9.2], caps: [[0, '크루즈를 켠 채 어린이보호구역(제한 30km/h)에 들어섭니다.'], [4.5, '주차된 차량 사이에서 어린이가 뛰어나옵니다.'], [6.4, '작은 보행자는 인식이 늦습니다. 직접 브레이크를 밟아야 합니다.'], [9.4, '어린이보호구역에서는 크루즈를 끄고 직접 운전하세요.']],
+    bg(c) { c.fillStyle = '#353D49'; c.fillRect(0, 60, 160, 9); road(c, 30, 60, [], 45); c.fillStyle = 'rgba(190,70,55,.42)'; c.fillRect(50, 30.8, 110, 28.4);
+      c.fillStyle = C.line; for (let y = 31.5; y < 59; y += 3.4) c.fillRect(100, y, 8, 1.7);
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(52, 23, 4.6, 0, 7); c.fill(); c.strokeStyle = '#E03A3A'; c.lineWidth = 1.1; c.beginPath(); c.arc(52, 23, 4.1, 0, 7); c.stroke(); c.fillStyle = '#111'; c.font = '700 4.6px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('30', 52, 23.3); },
+    actors: [{ k: 'car', c: '#7C8796', kf: [[0, 72, 64.5]] }, { k: 'car', c: '#B7A88E', kf: [[0, 86.5, 64.5]] }, { k: 'child', kf: [[0, 93, 65.5], [5.8, 93, 65.5], [7.5, 95, 54], [9, 96.5, 44], [12, 98, 30]] }, { k: 'ego', kf: [[0, 5, 52.5], [5, 55, 52.5], [6.5, 70, 52.5], [7.3, 78, 52.5, 0, 1], [9, 85, 52.5, 0, 1], [12, 86, 52.5, 0, 1]] }] },
+};
+const DUR = 12;
+function drawSim(t) {
+  const cv = $('#simCanvas'), c = cv.getContext('2d'), s = SIMS[A.sim.tpl], env = A.sim.env, k = cv.width / 160;
+  c.setTransform(k, 0, 0, k, 0, 0); c.fillStyle = C.ground; c.fillRect(0, 0, 160, 90); c.setLineDash([]);
+  s.bg(c, t);
+  let ego = null;
+  for (const a of s.actors) { const p = Object.assign({ k: a.k, c: a.c }, kfAt(a.kf, t)); drawActor(c, p); if (a.k === 'ego') ego = p; }
+  if (s.fg) s.fg(c, t);
+  if (env.night) {
+    c.fillStyle = 'rgba(4,8,22,.52)'; c.fillRect(0, 0, 160, 90);
+    c.save(); c.translate(ego.x, ego.y); c.rotate(ego.rot * Math.PI / 180); const g = c.createLinearGradient(6, 0, 46, 0); g.addColorStop(0, 'rgba(255,240,190,.42)'); g.addColorStop(1, 'rgba(255,240,190,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(6, -2); c.lineTo(46, -11); c.lineTo(46, 11); c.lineTo(6, 2); c.closePath(); c.fill(); c.restore();
+  }
+  if (env.rain) { c.fillStyle = 'rgba(40,60,90,.2)'; c.fillRect(0, 0, 160, 90); c.strokeStyle = 'rgba(205,225,255,.42)'; c.lineWidth = 0.3; c.beginPath(); for (let i = 0; i < 80; i++) { const x = (i * 37 + t * 70) % 180 - 10, y = (i * 53 + t * 150) % 100 - 5; c.moveTo(x, y); c.lineTo(x - 1.4, y + 4); } c.stroke(); }
+  if (t >= s.alert[0] && t <= s.alert[1]) { const pu = 1 + 0.25 * Math.sin(t * 9); c.strokeStyle = '#FFB020'; c.lineWidth = 0.9; c.beginPath(); c.arc(ego.x, ego.y, 10 * pu, 0, 7); c.stroke(); c.fillStyle = '#FFB020'; c.beginPath(); c.arc(ego.x, ego.y - 13, 3.4, 0, 7); c.fill(); c.fillStyle = '#1A1300'; c.font = '700 5px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('!', ego.x, ego.y - 12.7); }
+  c.fillStyle = 'rgba(8,12,20,.6)'; rr(c, 3, 3, 30, 7, 2); c.fill(); c.fillStyle = '#EAF0F8'; c.font = '600 3.6px sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText('● 내 차(크루즈)', 5.4, 6.7); c.fillStyle = C.ego; c.fillText('●', 5.4, 6.7);
+  let cap = s.caps[0][1]; for (const [ct, tx] of s.caps) if (t >= ct) cap = tx; $('#simCap').textContent = cap; $('#simProg').style.width = (t / DUR * 100) + '%';
+}
+let simRaf = 0, simNextTimer = 0;
+function playSim() {
+  cancelAnimationFrame(simRaf); clearTimeout(simNextTimer); const t0 = performance.now();
+  const step = () => { if (!A.sim) return; const t = Math.min(DUR, (performance.now() - t0) / 1000); drawSim(t); if (t < DUR) simRaf = requestAnimationFrame(step); else if (A.queue.length) simNextTimer = setTimeout(nextSim, 1000); };
+  step();
+}
+function openSim(tpl, title, kind, e) {
+  if (A.trip) return toast('주행 중에는 영상을 재생할 수 없습니다');
+  A.sim = { tpl, env: e }; $('#simTitle').textContent = title; $('#simKind').textContent = `${kind} · ${TPL[tpl].label}`;
+  $('#simEnv').innerHTML = `<span class="chip">${e.rain ? '우천' : '맑음'}</span><span class="chip">${e.night ? '야간' : '주간'}</span>`;
+  $('#simNext').hidden = !A.queue.length; $('#simModal').hidden = false;
+  log('App', `시뮬레이션 재생: ${title} · ${TPL[tpl].label} 템플릿 (${e.rain ? '우천' : '맑음'}/${e.night ? '야간' : '주간'})`); playSim();
+}
+function closeSim() { A.sim = null; A.queue = []; cancelAnimationFrame(simRaf); clearTimeout(simNextTimer); $('#simModal').hidden = true; }
+function simHz(id, queued) {
+  const r = route(), h = r && r.hz.find(x => x.id === id); if (!h || TPL[h.tpl].nosim) return;
+  if (!queued) A.queue = [];
+  A.viewed.add(h.id); openSim(h.tpl, h.name, queued ? `유의지점 미리보기 · 남은 ${A.queue.length}곳` : '출발 전 미리보기', env());
+  if (A.sim) { map.easeTo({ center: [h.lon, h.lat], zoom: 15.5, pitch: 0, bearing: 0 }); render(); }
+}
+function nextSim() { const id = A.queue.shift(); if (id) simHz(id, true); else closeSim(); }
+
+/* ================= map ================= */
+const sysDark = matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => S.theme === 'dark' || (S.theme !== 'light' && sysDark.matches);
+const styleUrl = () => `https://tiles.openfreemap.org/styles/${isDark() ? 'dark' : 'liberty'}`;
+let mapDark = isDark();
+function applyTheme() {             // 화면 모드: 시스템 설정을 따르거나 사용자가 고른 값
+  const el = document.documentElement; if (S.theme === 'system') el.removeAttribute('data-theme'); else el.dataset.theme = S.theme;
+  $('meta[name=theme-color]').content = isDark() ? '#10161F' : '#F6F8FB';
+  if (isDark() !== mapDark) { mapDark = isDark(); map.setStyle(styleUrl()); }
+}
+sysDark.addEventListener('change', () => { if (S.theme === 'system') applyTheme(); });
+const map = new maplibregl.Map({ container: 'map', style: styleUrl(), bounds: [[125.3, 33.1], [129.9, 38.6]], fitBoundsOptions: { padding: innerWidth >= 760 ? { left: 410, top: 20, right: 20, bottom: 20 } : { top: 110, bottom: Math.round(innerHeight * 0.4), left: 10, right: 10 } }, maxPitch: 60, attributionControl: { compact: true } });
+const MK = { hz: [], pts: [], o: null, d: null, car: null, me: null, sel: null };
+const fc = fs => ({ type: 'FeatureCollection', features: fs });
+const lineF = (c, props) => ({ type: 'Feature', properties: props || {}, geometry: { type: 'LineString', coordinates: c } });
+map.on('style.load', () => {       // 처음 한 번, 그리고 화면 모드를 바꿔 지도 스타일을 갈아 끼울 때마다
+  if (map.getSource('route')) return;
+  for (const l of map.getStyle().layers)      // 지명을 한글로 표시
+    if (l.type === 'symbol' && l.layout && l.layout['text-field'] && JSON.stringify(l.layout['text-field']).includes('name')) map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]);
+  const before = (map.getStyle().layers.find(l => l.type === 'symbol') || {}).id, lay = { 'line-cap': 'round', 'line-join': 'round' };
+  for (const id of ['alts', 'route', 'traffic', 'cz']) map.addSource(id, { type: 'geojson', data: fc([]) });
+  map.addLayer({ id: 'alts', type: 'line', source: 'alts', layout: lay, paint: { 'line-color': mapDark ? '#7A8799' : '#8E99A8', 'line-width': 7, 'line-opacity': 0.75 } }, before);
+  map.addLayer({ id: 'route-case', type: 'line', source: 'route', layout: lay, paint: { 'line-color': '#FFFFFF', 'line-width': 11 } }, before);
+  map.addLayer({ id: 'route', type: 'line', source: 'route', layout: lay, paint: { 'line-color': '#2F6BFF', 'line-width': 7 } }, before);
+  map.addLayer({ id: 'traffic', type: 'line', source: 'traffic', layout: lay, paint: { 'line-color': ['get', 'c'], 'line-width': 7 } }, before);
+  map.addLayer({ id: 'cz', type: 'line', source: 'cz', layout: lay, paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-offset': 3, 'line-opacity': 0.9 } }, before);
+  drawRoutes(); drawTraffic(A.tab === 'traffic' && !A.trip);
+});
+map.on('click', 'alts', e => ACT.pick(e.features[0].properties.i));
+map.on('mouseenter', 'alts', () => { map.getCanvas().style.cursor = 'pointer'; }); map.on('mouseleave', 'alts', () => { map.getCanvas().style.cursor = ''; });
+map.once('load', () => { if (MOBILE()) locate(true); loadTraffic(); });
+map.on('click', async e => {            // 지도를 눌러 장소 선택
+  if (A.trip || A.busy || (map.getLayer('alts') && map.queryRenderedFeatures(e.point, { layers: ['alts'] }).length)) return;
+  const p = { name: '선택한 위치', sub: `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)}`, lat: e.lngLat.lat, lon: e.lngLat.lng };
+  if (route()) return;                  // 경로 미리보기 중에는 무시
+  selectPlace(p); const n = await reverse(p.lat, p.lon); if (n && A.sel === p) { Object.assign(p, n); render(); }
+});
+map.on('error', e => { if (e && e.error && /style/i.test(String(e.error.message))) toast('지도를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'); });
+function mkEl(cls, html, onclick, label) {
+  const el = document.createElement(onclick ? 'button' : 'div'); el.className = 'mk ' + cls; el.innerHTML = html || '';
+  if (label) { el.setAttribute('aria-label', label); el.title = label; }
+  if (onclick) el.addEventListener('click', ev => { ev.stopPropagation(); onclick(); });
+  return el;
+}
+const ic = (d, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const marker = (el, lon, lat, opt) => new maplibregl.Marker(Object.assign({ element: el }, opt)).setLngLat([lon, lat]).addTo(map);
+function drawMarkers() {
+  MK.hz.forEach(m => m.remove()); MK.hz = []; for (const k of ['o', 'd']) if (MK[k]) { MK[k].remove(); MK[k] = null; }
+  const r = route();
+  if (A.dest) { MK.d = marker(mkEl('pin dest', '도착'), A.dest.lon, A.dest.lat, { anchor: 'bottom' }); if (!A.trip) MK.o = marker(mkEl('pin', '출발'), A.origin.lon, A.origin.lat, { anchor: 'bottom' }); }
+  if (r) for (const h of r.hz) MK.hz.push(marker(mkEl('hz ' + h.tpl, ic(TPL[h.tpl].ic, 16), () => A.trip ? null : TPL[h.tpl].nosim ? toast(h.name) : simHz(h.id), h.name), h.lon, h.lat));
+}
+function drawRoutes() {
+  if (!map.getSource('route')) return;
+  const r = route();
+  map.getSource('alts').setData(fc(A.trip ? [] : A.routes.map((x, i) => i === A.ri ? null : lineF(x.c, { i })).filter(Boolean)));
+  map.getSource('route').setData(fc(r ? [lineF(r.c)] : []));
+  map.getSource('traffic').setData(fc(r ? r.tf.map(x => lineF(sliceOf(r, x.a, x.b), { c: GRADE[x.g][2] })) : [])); drawMarkers();
+}
+function drawTraffic(show) {        // 교통 탭: 서행·정체 구간을 양 끝 지점을 잇는 선으로 표시
+  if (!map.getSource('cz')) return;
+  map.getSource('cz').setData(fc(show ? TR.list.filter(c => c.g >= 2 && c.xy).map(c => lineF([[c.xy[0], c.xy[1]], [c.xy[2], c.xy[3]]], { c: GRADE[c.g][2] })) : []));
+}
+function drawPoints(show) { MK.pts.forEach(m => m.remove()); MK.pts = show ? DB.points.filter(p => !A.mine || p.mine).map(p => marker(mkEl('pt' + (isPublic(p) ? '' : ' pend'), '', () => ACT.flyPt(p.id), p.name), p.lon, p.lat)) : []; }
+function drawSel() { if (MK.sel) { MK.sel.remove(); MK.sel = null; } if (A.sel) MK.sel = marker(mkEl('sel'), A.sel.lon, A.sel.lat); }
+function drawMe() { if (!A.fix) return; if (!MK.me) MK.me = marker(mkEl('me'), A.fix.lon, A.fix.lat); else MK.me.setLngLat([A.fix.lon, A.fix.lat]); }
+function drawCar() { const r = route(), p = posAt(r, 0); MK.car = marker(mkEl('car', ic('M12 19V6M6 12l6-6 6 6', 20)), p[0], p[1], { rotationAlignment: 'map', pitchAlignment: 'map' }); drawRoutes(); }
+function fit(r) {
+  const b = new maplibregl.LngLatBounds(); for (const c of r.c) b.extend(c);
+  const wide = innerWidth >= 760;
+  map.fitBounds(b, { padding: { top: wide ? 70 : 130, left: wide ? 430 : 40, right: 60 + (innerWidth >= 1000 && A.console ? 330 : 0), bottom: wide ? 70 : Math.round(innerHeight * 0.5) }, pitch: 0, bearing: 0, duration: 800 });
+}
+
+/* ================= views ================= */
+const NAV = [['home', '지도', 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2ZM9 4v14M15 6v14'], ['traffic', '교통', 'M9 3h6v18H9ZM12 7h.01M12 12h.01M12 17h.01'], ['points', '개입 지도', 'M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11ZM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z'], ['report', '리포트', 'M5 20V10M12 20V4M19 20v-7'], ['settings', '설정', 'M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4']];
+const placeItem = (p, act, arg, extra) => `<button class="item" data-act="${act}" data-arg="${arg}"><span class="ico plain">${ic('M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11Z')}</span><span class="txt"><b>${esc(p.name)}</b><span class="note">${esc(p.sub || '')}</span></span>${extra || ''}</button>`;
+function viewHome() {
+  const fr = DB.hist.filter(freq), rec = DB.hist.slice(0, 6);
+  return `<div><h2 class="h">어디로 갈까요?</h2><p class="sub">위 검색창에 목적지를 입력하거나 지도를 눌러 장소를 고르세요. 출발지는 <b>${esc(A.origin.name)}</b>입니다.</p></div>
+    ${A.err ? `<div class="banner err">${esc(A.err)}</div>` : ''}
+    ${MOBILE() ? '' : '<div class="banner">데스크탑은 미리보기 화면입니다. 경로 검색, 예상 소요시간, 유의지점 시뮬레이션과 모의 주행을 볼 수 있고, 실제 위치를 따라가는 주행 안내는 휴대폰 앱에서 동작합니다.</div>'}
+    ${fr.length ? `<div class="list"><div class="eyebrow">자주 가는 길 · 선택하면 유의지점 영상을 먼저 재생합니다</div>${fr.slice(0, 3).map(p => placeItem(p, 'hist', DB.hist.indexOf(p), `<span class="chip acc">${p.n}회</span>`)).join('')}</div>` : ''}
+    ${rec.length ? `<div class="list"><div class="eyebrow">최근 목적지</div>${rec.map(p => placeItem(p, 'hist', DB.hist.indexOf(p))).join('')}</div>` : ''}
+    ${TR.at ? `<button class="item" data-act="tab" data-arg="traffic"><span class="ico ${TR.list.some(c => c.g === 3) ? 'school' : 'plain'}">${ic(NAV[1][2])}</span><span class="txt"><b>고속도로 정체 ${TR.list.filter(c => c.g === 3).length}구간 · 서행 ${TR.list.filter(c => c.g === 2).length}구간</b><span class="note">${TR.std} 기준 · 노선별 교통 상황 보기</span></span></button>` : ''}
+    <div class="row"><button class="btn grow primary" data-act="demo">${A.demo ? '자동 시연 중지' : '자동 시연 보기'}</button><button class="btn grow" data-act="console">가상 차량 콘솔</button></div>
+    <p class="note">자동 시연은 ${DEF.name}에서 ${DEMO.name}까지 경로를 찾아 유의지점 영상, 모의 주행, ${AHEAD}m 전 음성 안내, 개입 기록, 리포트까지 차례로 보여 줍니다.</p>`;
+}
+function viewResults() {
+  return `<div class="row between"><h2 class="h">검색 결과</h2><button class="btn sm" data-act="clearQ">닫기</button></div>
+    <div class="list">${A.results.length ? A.results.map((p, i) => placeItem(p, 'pickRes', i)).join('') : `<p class="note">${A.resFinal ? '검색 결과가 없습니다. 다른 이름으로 검색하거나 지도에서 위치를 직접 눌러 주세요.' : '일치하는 장소가 없습니다. 엔터를 누르면 주소까지 넓혀 검색합니다.'}</p>`}</div>`;
+}
+function viewPlace() {
+  const p = A.sel;
+  return `<div class="row between"><div style="min-width:0;flex:1"><h2 class="h">${esc(p.name)}</h2><p class="sub">${esc(p.sub || '')}</p></div><button class="btn sm" data-act="unsel">닫기</button></div>
+    <div class="row"><button class="btn grow primary" data-act="toHere">${ic('M5 19v-5a4 4 0 0 1 4-4h10M15 6l4 4-4 4', 16)} 길찾기</button><button class="btn grow" data-act="fromHere">출발지로</button></div>
+    <div class="row"><button class="btn sm" data-act="fav" data-arg="home">집으로 저장</button><button class="btn sm" data-act="fav" data-arg="work">회사로 저장</button></div>`;
+}
+function hzItem(h) {
+  const t = TPL[h.tpl], p = ptOf(h), seen = A.viewed.has(h.id);
+  return `<div class="item"><span class="ico ${h.tpl}">${ic(t.ic)}</span><div class="txt"><b>${esc(h.name)}</b><div class="note">출발 후 ${fmtDist(h.m)} · ${t.label}${p ? ` · 개입 ${p.hit}건 / 차량 ${p.veh}대${p.mine ? ` · 내 개입 ${p.mine}회` : ''}` : ''}</div></div>${t.nosim ? '' : `<button class="btn sm ${seen ? 'on' : ''}" data-act="simHz" data-arg="${h.id}">${seen ? '다시 보기' : '영상 보기'}</button>`}</div>`;
+}
+function viewRoute() {
+  const r = route(), sims = r.hz.filter(h => !TPL[h.tpl].nosim).length, best = bestRoute(), live = A.routes.some(x => x.tf.length);
+  const tfNote = x => x.tf.length ? (x.jam ? `정체 ${x.jam}구간` : x.slow ? `서행 ${x.slow}구간` : '고속도로 원활') : '';
+  return `<div class="row between"><div style="min-width:0;flex:1"><div class="eyebrow">${esc(A.origin.name)} →</div><h2 class="h">${esc(A.dest.name)}</h2></div><button class="btn sm" data-act="clearDest">닫기</button></div>
+    <div class="row">${A.routes.map((x, i) => `<button class="opt ${i === A.ri ? 'on' : ''}" data-act="pick" data-arg="${i}"><div class="eyebrow">${i === best ? (live ? '추천 · 실시간 교통 반영' : '추천 경로') : '다른 경로'}</div><div class="stat">${fmtDur(x.eta)}</div><div class="note">${fmtDist(x.len)} · ${hhmm(new Date(Date.now() + x.eta * 1000))} 도착${tfNote(x) ? ' · ' + tfNote(x) : ''} · 유의 ${x.hz.length}곳</div></button>`).join('')}</div>
+    <div class="row">${MOBILE() ? '<button class="btn grow primary" data-act="start">안내 시작</button><button class="btn grow" data-act="mock">모의 주행</button>' : '<button class="btn grow primary" data-act="mock">모의 주행으로 미리보기</button>'}</div>
+    ${r.tf.length ? `<div class="list"><div class="eyebrow">이 경로의 고속도로 소통 · ${TR.std} 기준 한국도로공사</div>${r.tf.filter(x => x.g >= 2).slice(0, 5).map(x => `<div class="item"><div class="txt"><b>${esc(x.name.replace('-', ' → '))}</b><div class="note">${esc(x.line)} · 출발 후 ${fmtDist(x.a)} · ${fmtDist(x.b - x.a)} 구간</div></div><b>${x.sp}km/h</b><span class="chip ${GRADE[x.g][1]}">${GRADE[x.g][0]}</span></div>`).join('') || '<p class="note">경로 위 고속도로 구간은 모두 원활합니다.</p>'}</div>` : `<p class="note">${TR.at ? '이 경로에는 실시간 소통 정보가 있는 고속도로 구간이 없습니다. 소요 시간은 도로별 기본 속도로 계산했습니다.' : TR.err ? '고속도로 소통 정보를 받지 못해 기본 속도로 계산했습니다.' : '고속도로 소통 정보를 불러오는 중입니다…'}</p>`}
+    <div class="row between"><div class="eyebrow">경로 위 유의지점 ${r.hz.length}곳${r.schoolOk == null ? ' · 학교 조회 중…' : r.osmOk == null ? ' · 단속카메라·터널 조회 중…' : r.osmOk ? '' : ' · 단속카메라·터널은 서버 혼잡으로 불러오지 못함'}</div>${sims ? `<button class="btn sm primary" data-act="playAll">전체 미리보기</button>` : ''}</div>
+    <div class="list">${r.hz.length ? r.hz.map(hzItem).join('') : '<p class="note">이 경로에서 찾은 유의지점이 없습니다.</p>'}</div>
+    <p class="note">${MOBILE() ? '‘안내 시작’은 휴대폰의 현재 위치(GPS)를 따라 안내하고, ‘모의 주행’은 위치 없이 경로를 따라 달려 봅니다.' : '데스크탑은 미리보기 전용이라 실제 주행 안내는 휴대폰 앱에서만 시작할 수 있습니다.'} 영상은 출발 전 정차 중에만 재생되고, 주행 중에는 각 유의지점 ${AHEAD}m 앞에서 음성으로 알려 드립니다.</p>`;
+}
+function viewPoints() {
+  const pts = DB.points.filter(p => !A.mine || p.mine), pub = DB.points.filter(isPublic).length;
+  return `<div class="row between"><div><h2 class="h">${A.mine ? '나만의 지도' : '모두의 개입 지도'}</h2><p class="sub">공개 ${pub}곳 · 집계 중 ${DB.points.length - pub}곳</p></div>
+    <span class="seg"><button class="${A.mine ? '' : 'on'}" data-act="mine" data-arg="">모두</button><button class="${A.mine ? 'on' : ''}" data-act="mine" data-arg="1">내 기록</button></span></div>
+    <div class="list">${pts.length ? pts.map(p => `<div class="item" style="flex-wrap:wrap"><span class="ico ${p.tpl}">${ic(TPL[p.tpl].ic)}</span><div class="txt"><b>${esc(p.name)}</b><div class="note">개입률 ${per100(rate(p))}% · 크루즈 통과 ${p.pass}대 · 개입 ${p.hit}건 · 차량 ${p.veh}대${p.rh ? ` · 빗길 ${p.rh}건` : ''}${p.nh ? ` · 야간 ${p.nh}건` : ''}${p.mine ? ` · 내 개입 ${p.mine}회` : ''}</div></div>
+      ${isPublic(p) ? '<span class="chip ok">공개 중</span>' : '<span class="chip">집계 중</span>'}<button class="btn sm" data-act="flyPt" data-arg="${p.id}">지도</button><button class="btn sm" data-act="simPt" data-arg="${p.id}">영상</button></div>`).join('')
+      : '<p class="note">아직 기록된 개입 지점이 없습니다. 주행 중 크루즈를 켠 채 브레이크나 조향으로 개입하면 그 위치가 여기에 쌓입니다.</p>'}</div>
+    <p class="note">서로 다른 차량 5대 이상, 개입률 8% 이상인 지점만 다른 운전자에게 공개됩니다. 점선 원은 아직 집계 중인 지점입니다. 다른 차량의 기록은 콘솔의 버튼으로 흉내 냅니다.</p>`;
+}
+function viewTraffic() {
+  if (!TR.at) return `<div><h2 class="h">실시간 고속도로 교통</h2><p class="sub">${TR.err ? '교통 정보를 받지 못했습니다. 잠시 뒤 다시 시도해 주세요.' : '교통 정보를 불러오는 중입니다…'}</p></div><div class="row"><button class="btn" data-act="trRefresh">다시 불러오기</button></div>`;
+  const lines = {};
+  for (const c of TR.list) { const l = lines[c.line] || (lines[c.line] = { name: c.line, n: 0, bad: [], jam: 0, slow: 0 }); l.n++; if (c.g === 3) l.jam++; if (c.g === 2) l.slow++; if (c.g >= 2) l.bad.push(c); }
+  const arr = Object.values(lines).sort((a, b) => b.jam - a.jam || b.slow - a.slow || a.name.localeCompare(b.name, 'ko'));
+  const n = g => TR.list.filter(c => c.g === g).length;
+  return `<div class="row between"><div><h2 class="h">실시간 고속도로 교통</h2><p class="sub">${TR.std} 기준 · 한국도로공사 소통 정보</p></div><button class="btn sm" data-act="trRefresh">${TR.loading ? '받는 중…' : '새로고침'}</button></div>
+    <div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))">${[3, 2, 1].map(g => `<div class="tile"><div class="eyebrow">${GRADE[g][0]}</div><div class="stat">${n(g)}<small>구간</small></div></div>`).join('')}</div>
+    <div class="list"><div class="eyebrow">노선별 교통 상황 · 정체가 많은 순</div>${arr.map(l => `<details class="line"${A.openLine === l.name ? ' open' : ''}><summary data-act="openLine" data-arg="${esc(l.name)}"><span class="nm">${esc(l.name)}</span>${l.jam ? `<span class="chip crit">정체 ${l.jam}</span>` : ''}${l.slow ? `<span class="chip warn">서행 ${l.slow}</span>` : ''}${!l.jam && !l.slow ? '<span class="chip ok">원활</span>' : ''}</summary>
+      ${l.bad.sort((a, b) => a.sp - b.sp).map(c => `<div class="cz"><span class="nm">${esc(c.name.replace('-', ' → '))}</span><b>${c.sp}km/h</b><span class="chip ${GRADE[c.g][1]}">${GRADE[c.g][0]}</span>${c.xy ? `<button class="btn sm" data-act="flyCz" data-arg="${c.id}">지도</button>` : ''}</div>`).join('') || `<div class="cz"><span class="nm">전체 ${l.n}개 구간이 원활합니다.</span></div>`}</details>`).join('')}</div>
+    <p class="note">로드플러스와 같은 한국도로공사 검지기(VDS) 소통 정보를 4분마다 받아 옵니다. 고속도로만 제공되며 국도·시내 도로의 혼잡도는 포함되지 않습니다. 지도의 색 선은 구간 양 끝 지점을 이은 것으로, 실제 도로 모양과 조금 다를 수 있습니다.</p>`;
+}
+function streak() { const days = new Set(DB.trips.map(t => t.day)); let n = 0; const d = new Date(); if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1); while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); } return n; }
+function viewReport() {
+  const L = A.lastTrip || DB.trips.slice(-1)[0], contrib = DB.points.reduce((a, x) => a + (x.mine || 0), 0), st = streak();
+  const perfect = t => t.ready[1] > 0 && t.ready[0] === t.ready[1];
+  const badges = [['첫 개입 기록', DB.events.length >= 1], ['7일 연속 주행', st >= 7], ['준비 만점 통과', DB.trips.some(perfect)], ['빗길 준비 통과', DB.trips.some(t => t.rain && perfect(t))], ['지도 기여 10건', contrib >= 10]];
+  const kindKo = e => e.kind === 'system' ? '시스템 해제' : e.kind === 'voice' ? '음성 신고' : e.by === 'steer' ? `조향 개입 ${e.steer}°` : `제동 개입 ${e.brake}%`;
+  let top;
+  if (!L) top = `<div><h2 class="h">주행 리포트</h2><p class="sub">아직 주행 기록이 없습니다. 목적지를 정하고 안내를 시작해 보세요.</p></div>`;
+  else top = `<div><h2 class="h">주행 리포트 · ${esc(L.routeName)}</h2><p class="sub">${L.day.slice(5).replace('-', '.')} · ${L.km}km 주행${L.rain ? ' · 빗길' : ''}${L.night ? ' · 야간' : ''}${L.waypoint ? ` · ${esc(L.waypoint.name)} 경유` : ''}</p></div>
+    <div class="tiles"><div class="tile"><div class="eyebrow">크루즈 사용</div><div class="stat">${L.cruiseMin}<small>분</small></div></div><div class="tile"><div class="eyebrow">개입</div><div class="stat">${L.events}<small>회</small></div></div>
+      <div class="tile"><div class="eyebrow">준비 점수</div><div class="stat">${L.ready[0]}<small>/ ${L.ready[1]}</small></div></div><div class="tile"><div class="eyebrow">연속 기록</div><div class="stat">${st}<small>일</small></div></div></div>
+    ${L.shared ? `<div class="banner">내 기록 ${L.shared}건이 개입 지도에 반영되었습니다.</div>` : ''}
+    <div class="list"><div class="eyebrow">개입한 순간</div>${(L.evs || []).length ? L.evs.map(e => `<div class="item"><div class="txt"><b>${esc(e.place)}</b><div class="note">${e.clock} · ${kindKo(e)} · 설정 ${e.target}km/h${e.rain ? ' · 우천' : ''}${e.night ? ' · 야간' : ''}</div></div><button class="btn sm" data-act="replay" data-arg="${e.id}">다시보기</button></div>`).join('') : '<p class="note">이번 주행에서는 개입이 없었습니다.</p>'}</div>
+    <div class="list"><div class="eyebrow">유의지점 통과</div>${(L.readyList || []).length ? L.readyList.map(x => `<div class="item"><div class="txt"><b>${esc(x.name)}</b><div class="note">${x.checkin ? '음성 체크인으로 확인' : '음성 안내 후 통과'}</div></div><span class="chip ${x.ok ? 'ok' : 'crit'}">${x.ok ? '준비 통과' : '급제동·강제 해제'}</span></div>`).join('') : '<p class="note">안내받은 유의지점이 없습니다.</p>'}</div>`;
+  return `${top}<div class="list"><div class="eyebrow">배지</div><div class="badges">${badges.map(b => `<span class="badge ${b[1] ? 'got' : ''}">${b[1] ? '✓ ' : ''}${b[0]}</span>`).join('')}</div></div>
+    ${DB.trips.length ? `<div class="list"><div class="eyebrow">최근 주행</div>${DB.trips.slice(-7).reverse().map(t => `<div class="item"><div class="txt"><b>${t.day.slice(5).replace('-', '.')} · ${esc(t.routeName)}</b><div class="note">${t.km}km · 크루즈 ${t.cruiseMin}분 · 개입 ${t.events}회 · 준비 ${t.ready[0]}/${t.ready[1]}</div></div></div>`).join('')}</div>` : ''}`;
+}
+function viewSettings() {
+  const sw = (k, t, d) => `<div class="switch"><div><b>${t}</b><div class="note">${d}</div></div><button class="tog ${S[k] ? 'on' : ''}" data-act="set" data-arg="${k}" role="switch" aria-checked="${S[k]}" aria-label="${t}"></button></div>`;
+  return `<div><h2 class="h">설정</h2><p class="sub">모든 안내는 켜고 끌 수 있습니다.</p></div>
+<div class="switch"><div><b>화면 모드</b><div class="note">기기 화면 설정(다크 모드)을 따르거나 직접 고릅니다. 지도 색도 함께 바뀝니다.</div></div><span class="seg">${[['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']].map(o => `<button class="${S.theme === o[0] ? 'on' : ''}" data-act="theme" data-arg="${o[0]}">${o[1]}</button>`).join('')}</span></div>
+    ${sw('voice', '유의지점 음성 안내', `각 유의지점 ${AHEAD}m 앞에서 “전방 ${AHEAD}미터 앞 ○○입니다. 운전에 주의하세요.”라고 알립니다.`)}
+    ${sw('cruiseOnly', '크루즈 작동 중에만 안내', '켜면 크루즈를 쓰지 않을 때는 유의지점을 조용히 지나갑니다.')}
+    ${sw('checkin', '음성 체크인', '개입 없이 크루즈 주행이 길어지면 유의지점 1km 앞에서 준비 여부를 묻습니다.')}
+    <div class="switch"><div><b>체크인 기준 시간</b><div class="note">실제 기본값은 30분입니다. 시연을 위해 짧게 바꿀 수 있습니다.</div></div><span class="seg">${[1, 10, 30].map(n => `<button class="${S.cmin === n ? 'on' : ''}" data-act="cmin" data-arg="${n}">${n}분</button>`).join('')}</span></div>
+    ${sw('share', '개입 기록 공유', '끄면 기록이 이 기기에만 남고 모두의 지도에는 반영되지 않습니다.')}
+    <div class="card"><h3>개인정보 처리</h3><p class="note">익명 ID <b>${DB.id}</b>만 사용합니다. 개입 지점과 최근 목적지는 이 브라우저에만 저장하며, 출발지·목적지 반경 500m 안의 개입은 저장하지 않습니다. 검색어와 경로 탐색용 출발·도착 좌표는 아래 공개 서비스로 전송됩니다.</p>
+      <div class="row">${A.confirmReset ? '<span class="note">모든 기록을 지우고 처음 상태로 되돌릴까요?</span><button class="btn sm danger" data-act="resetYes">지우기</button><button class="btn sm" data-act="resetNo">취소</button>' : '<button class="btn sm" data-act="reset">내 기록 초기화</button>'}</div></div>
+    <div class="card"><h3>데이터 출처</h3><p class="note">지도 OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors / 경로 OSRM / 검색 Photon · Nominatim / 도로 시설 Overpass API / 실시간 고속도로 소통·휴게소 위치 한국도로공사 고속도로 공공데이터 포털. 교통 정보는 고속도로만 반영하며, 어린이보호구역은 초등학교 위치로 추정합니다. 실제 앱에서는 Pleos Connect NaviHelper의 경로·주의 지점 정보를 사용합니다.</p></div>`;
+}
+function viewHtml() {
+  if (A.busy) return `<div class="busy"><span class="spin"></span>${esc(A.busy)}</div>`;
+  if (A.results) return viewResults();
+  if (A.tab === 'traffic') return viewTraffic();
+  if (A.tab === 'points') return viewPoints();
+  if (A.tab === 'report') return viewReport();
+  if (A.tab === 'settings') return viewSettings();
+  if (route()) return viewRoute();
+  if (A.sel) return viewPlace();
+  return viewHome();
+}
+const segHtml = (opts, cur, act) => opts.map(o => `<button class="${String(cur) === String(o[0]) ? 'on' : ''}" data-act="${act}" data-arg="${o[0]}">${o[1]}</button>`).join('');
+function syncConsole() {
+  $('#cGear').innerHTML = segHtml([['P', 'P 주차'], ['D', 'D 주행']], V.gear, 'gear');
+  const sc = segHtml([[1, '1×'], [5, '5×'], [15, '15×']], A.scaleBackup || V.scale, 'scale'); $('#cScale').innerHTML = sc; $('#qScale').innerHTML = sc; $('#qScale').hidden = !(A.trip && A.trip.mock);
+  $('#cSignal').innerHTML = segHtml([['OFF', 'Off'], ['L', '좌'], ['R', '우']], V.signal, 'signal');
+  $('#cWiper').innerHTML = segHtml([['OFF', 'Off'], ['AUTO', 'Auto'], ['LOW', 'Low'], ['HIGH', 'High']], V.wiper, 'wiper');
+  $('#cLight').innerHTML = segHtml([['OFF', 'Off'], ['AUTO', 'Auto'], ['LOW', 'Low beam']], V.light, 'light');
+  $('#oCruise').textContent = V.cruise; $('#oTarget').textContent = V.target + ' km/h'; $('#inTarget').value = V.target;
+  $('#oBrake').textContent = V.brake + '%'; $('#inBrake').value = V.brake; $('#oSteer').textContent = V.steer + '°'; $('#inSteer').value = V.steer;
+  $('#qBrake').textContent = V.brake > 0 ? '브레이크 떼기' : '브레이크 밟기'; $('#qBrake').classList.toggle('on', V.brake > 0);
+  $('#qCruise').textContent = V.cruise === 'SUSPENDED' ? '크루즈 재개' : '크루즈 켜기'; $('#qCruise').classList.toggle('on', V.cruise === 'ACTIVATED');
+  const cc = $('#chipCruise'); cc.textContent = CRUISE_KO[V.cruise]; cc.className = 'chip ' + (V.cruise === 'ACTIVATED' ? 'ok' : V.cruise === 'OFF' || V.cruise === 'ENABLED' ? '' : V.cruise === 'FORCED_DEACTIVATION_WARNING' ? 'crit' : 'warn');
+  $('#btnDemo').textContent = A.demo ? '자동 시연 중지' : '자동 시연 시작';
+  $('#fabMute').innerHTML = ic(A.mute ? 'M4 9v6h4l5 4V5L8 9H4ZM17 9l5 6M22 9l-5 6' : 'M4 9v6h4l5 4V5L8 9H4ZM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12', 22); $('#fabMute').classList.toggle('on', !A.mute);
+  $('#fabCon').classList.toggle('on', A.console);
+}
+function render() {
+  document.body.classList.toggle('driving', !!A.trip); document.body.classList.toggle('con-open', A.console);
+  const fav = k => { const f = DB.fav[k]; return `<button class="glass ${f ? '' : 'unset'}" data-act="favGo" data-arg="${k}">${ic(k === 'home' ? 'M4 11l8-7 8 7v9H4ZM10 20v-6h4v6' : 'M4 8h16v12H4ZM9 8V5h6v3', 15)}${k === 'home' ? '집' : '회사'}</button>`; };
+  $('#chips').innerHTML = fav('home') + fav('work') + DB.hist.slice(0, 5).map((p, i) => `<button class="glass" data-act="hist" data-arg="${i}">${esc(p.name)}</button>`).join('');
+  $('#tabs').innerHTML = NAV.map(n => `<button class="${A.tab === n[0] ? 'on' : ''}" data-act="tab" data-arg="${n[0]}">${ic(n[2], 22)}<span>${n[1]}</span></button>`).join('');
+  $('#panel').classList.toggle('collapsed', A.collapsed); $('#view').innerHTML = viewHtml();
+  drawPoints(A.tab === 'points' && !A.trip); drawTraffic(A.tab === 'traffic' && !A.trip); syncConsole(); live();
+}
+function live() {
+  $('#oM').textContent = fmtDist(V.m);
+  const T = A.trip, r = route(); if (!T || !r) return;
+  const hd = headAt(r, V.m), p = !T.mock && A.fix && T.off > 0 ? [A.fix.lon, A.fix.lat] : posAt(r, V.m);   // 경로를 벗어나면 실제 위치를 표시
+  if (MK.car) MK.car.setLngLat(p).setRotation(hd);
+  map.easeTo({ center: p, bearing: hd, pitch: 55, zoom: V.speed > 75 ? 15.3 : 16.5, offset: [0, Math.round(innerHeight * 0.16)], duration: 140, easing: x => x });
+  const n = r.steps.find((s, i) => i && s.m > V.m + 5 && major(s)) || r.steps[r.steps.length - 1];
+  $('#tbtDist').textContent = T.arrived ? '도착' : fmtDist(Math.max(0, n.m - V.m));
+  const txt = T.arrived ? T.dest : n.type === 'arrive' ? `목적지 · ${T.dest}` : instr(n) + (n.name ? ` · ${n.name}` : n.dest ? ` · ${n.dest.split(',')[0]} 방면` : '');
+  if ($('#tbtText').textContent !== txt) { $('#tbtText').textContent = txt; $('#tbtIco').innerHTML = n.type === 'arrive' || T.arrived ? ic('M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11ZM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z', 40) : `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${ROT[n.mod] || 0}deg)" aria-hidden="true"><path d="M12 20V5M5.5 11.5 12 5l6.5 6.5"/></svg>`; }
+  const left = travel(r, V.m), nh = r.hz.find(h => h.m > V.m);
+  $('#dEta').textContent = hhmm(new Date(Date.now() + left * 1000));
+  $('#dRemain').textContent = `${fmtDist(r.len - V.m)} · ${fmtDur(left)} 남음${nh ? ` · 다음 유의지점 ${fmtDist(nh.m - V.m)}` : ''}`;
+  $('#dSpd').textContent = Math.round(V.speed);
+  const cam = r.hz.find(h => h.tpl === 'cam' && h.max && h.m > V.m && h.m - V.m < 600); $('#dCam').hidden = !cam; if (cam) $('#dCam').textContent = cam.max;
+  const c = A.card, el = $('#dCard'); el.hidden = !c; if (!c) return;
+  const h = c.hid && r.hz.find(x => x.id === c.hid), big = h ? (h.m > V.m ? `${fmtDist(h.m - V.m)} 앞 · ${c.short}` : `${c.short} 통과 중`) : c.text;
+  const cls = 'dcard ' + c.cls; if (el.className !== cls) el.className = cls;
+  if ($('#dBig').textContent !== big) $('#dBig').textContent = big; if ($('#dSub').textContent !== (c.sub || '')) $('#dSub').textContent = c.sub || '';
+}
+
+/* ================= search box ================= */
+let qSeq = 0, qTimer;
+async function doSearch(final) {
+  const q = $('#q').value.trim(); $('#btnClear').hidden = !$('#q').value;
+  if (q.length < 2) { qSeq++; if (A.results) { A.results = null; render(); } return; }
+  const me = ++qSeq; const res = await search(q, final); if (me !== qSeq) return;
+  A.results = res; A.resFinal = final; A.collapsed = false; render();
+}
+$('#q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => doSearch(false), 350); });
+$('#q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(qTimer); doSearch(true); } });
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (SR && location.protocol !== 'file:') $('#btnMic').hidden = false;
+
+/* ================= actions ================= */
+const ACT = {
+  gear(g) { if (g === 'D') { prime(); startTrip(true); } else endTrip(); }, mock() { prime(); startTrip(true); }, end: endTrip,
+  async start() {                   // 실제 주행: 현재 위치를 다시 확인하고, 출발지가 달라졌으면 경로를 새로 찾은 뒤 안내
+    if (!route() || A.trip || A.starting) return;
+    if (!MOBILE()) return toast('실제 주행 안내는 휴대폰 앱에서 사용할 수 있습니다. 데스크탑에서는 모의 주행으로 미리 볼 수 있습니다.');
+    prime();
+    A.starting = true; toast('현재 위치를 확인하는 중입니다'); const c = await getPos(); A.starting = false;
+    if (!c) return toast('현재 위치를 확인하지 못했습니다. 위치 권한을 허용하거나 ‘모의 주행’을 눌러 주세요.');
+    const moved = !near({ lat: c.latitude, lon: c.longitude }, A.origin, 150); hereFrom(c);
+    if (moved) { A.noBrief = true; await loadRoutes(); A.noBrief = false; if (!route()) return; }
+    startTrip(false);
+  },
+  theme(v) { S.theme = v; save(); applyTheme(); render(); },
+  trRefresh() { loadTraffic(true); render(); }, openLine(n) { A.openLine = A.openLine === n ? null : n; },
+  flyCz(id) { const c = TR.list.find(x => x.id === id); if (c && c.xy) { map.easeTo({ center: [(c.xy[0] + c.xy[2]) / 2, (c.xy[1] + c.xy[3]) / 2], zoom: 11, pitch: 0, bearing: 0 }); A.collapsed = true; $('#panel').classList.add('collapsed'); } },
+  cruiseOn, forced() { if (V.cruise === 'ACTIVATED' || V.cruise === 'USER_OVERRIDE') setCruise('FORCED_DEACTIVATION_WARNING'); else toast('크루즈가 작동 중일 때 발생시킬 수 있습니다'); },
+  cruiseOff() { if (V.cruise !== 'OFF') setCruise('OFF'); },
+  brake: setBrake, brakeToggle() { setBrake(V.brake > 0 ? 0 : 60); },
+  scale(n) { V.scale = +n; A.scaleBackup = null; clearTimeout(slowTimer); syncConsole(); },
+  signal(v) { V.signal = v; syncConsole(); }, wiper(v) { V.wiper = v; log('Vehicle', `WiperState ${v}`); syncConsole(); }, light(v) { V.light = v; log('Vehicle', `LowBeamLightState ${v}`); syncConsole(); },
+  say: onVoice, others: addOthers,
+  tab(t) { A.tab = t; A.confirmReset = false; A.results = null; A.collapsed = false; render(); },
+  collapse() { A.collapsed = !A.collapsed; $('#panel').classList.toggle('collapsed', A.collapsed); },
+  console() { A.console = !A.console; render(); }, locate() { locate(false); },
+  mute() { A.mute = !A.mute; try { if (A.mute) speechSynthesis.cancel(); } catch (e) { /* ignore */ } syncConsole(); toast(A.mute ? '음성 안내를 껐습니다' : '음성 안내를 켰습니다'); },
+  clearQ() { $('#q').value = ''; $('#btnClear').hidden = true; qSeq++; A.results = null; render(); },
+  mic() { try { const r = new SR(); r.lang = 'ko-KR'; r.onresult = e => { $('#q').value = e.results[0][0].transcript; doSearch(true); }; r.onerror = () => toast('음성을 인식하지 못했습니다'); r.start(); toast('목적지를 말씀해 주세요'); } catch (e) { toast('음성 검색을 쓸 수 없습니다'); } },
+  routeBtn() { if (A.sel) goTo(A.sel); else if (A.results && A.results.length) goTo(A.results[0]); else if ($('#q').value.trim().length >= 2) doSearch(true); else { $('#q').focus(); toast('목적지를 입력해 주세요'); } },
+  pickRes(i) { selectPlace(A.results[+i]); }, unsel() { A.sel = null; drawSel(); render(); },
+  toHere() { goTo(A.sel); }, fromHere() { A.origin = Object.assign({}, A.sel); A.sel = null; drawSel(); toast(`출발지를 ${A.origin.name}(으)로 정했습니다`); if (A.dest) loadRoutes(); else render(); },
+  fav(k) { DB.fav[k] = { name: A.sel.name, sub: A.sel.sub, lat: A.sel.lat, lon: A.sel.lon }; save(); toast(`${k === 'home' ? '집' : '회사'}으로 저장했습니다`); render(); },
+  favGo(k) { const f = DB.fav[k]; if (f) goTo(Object.assign({}, f)); else toast(`장소를 검색하거나 지도에서 고른 뒤 ‘${k === 'home' ? '집' : '회사'}으로 저장’을 누르세요`); },
+  hist(i) { const p = DB.hist[+i]; if (p) goTo({ name: p.name, sub: p.sub, lat: p.lat, lon: p.lon }); },
+  pick(i) { if (A.trip || +i === A.ri || !A.routes[+i]) return; A.ri = +i; A.picked = true; A.viewed.clear(); drawRoutes(); ensureOSM(route()); render(); },
+  clearDest() { closeSim(); A.dest = null; A.routes = []; A.err = null; $('#q').value = ''; $('#btnClear').hidden = true; drawRoutes(); render(); },
+  simHz(id) { simHz(id); }, playAll() { const r = route(); if (!r) return; A.queue = r.hz.filter(h => !TPL[h.tpl].nosim).slice(0, 6).map(h => h.id); nextSim(); },
+  simClose() { closeSim(); render(); }, simAgain: playSim, simNext: nextSim,
+  replay(id) { const e = DB.events.find(x => x.id === id); if (e) { A.queue = []; openSim(e.tpl, e.place, '내 개입 순간 다시보기', { rain: e.rain, night: e.night }); } },
+  simPt(id) { const p = DB.points.find(x => x.id === id); if (p) { A.queue = []; openSim(p.tpl, p.name, '개입 지점 미리보기', env()); } },
+  flyPt(id) { const p = DB.points.find(x => x.id === id); if (p) { map.easeTo({ center: [p.lon, p.lat], zoom: 15.5, pitch: 0, bearing: 0 }); toast(p.name); } },
+  mine(v) { A.mine = !!v; render(); },
+  set(k) { S[k] = !S[k]; save(); log('App', `설정 변경: ${k} = ${S[k]}`); render(); }, cmin(n) { S.cmin = +n; save(); render(); },
+  reset() { A.confirmReset = true; render(); }, resetNo() { A.confirmReset = false; render(); },
+  resetYes() { store.del('nav'); DB = seedDB(); Object.assign(S, DB.settings); DB.settings = S; A.lastTrip = null; A.confirmReset = false; save(); toast('기록을 초기화했습니다'); render(); },
+  demo() { if (A.demo) stopDemo('자동 시연을 중지했습니다'); else { prime(); runDemo(); } },
+};
+document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b || b.disabled) return; const f = ACT[b.dataset.act]; if (f) f(b.dataset.arg); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && A.sim) ACT.simClose(); });
+$('#inTarget').addEventListener('input', e => { V.target = +e.target.value; $('#oTarget').textContent = V.target + ' km/h'; });
+$('#inBrake').addEventListener('input', e => setBrake(e.target.value));
+const steer = $('#inSteer');
+steer.addEventListener('input', e => { V.steer = +e.target.value; $('#oSteer').textContent = V.steer + '°'; vehicleRules(); });
+const steerBack = () => { V.steer = 0; steer.value = 0; $('#oSteer').textContent = '0°'; vehicleRules(); };
+steer.addEventListener('change', steerBack); steer.addEventListener('pointerup', steerBack); steer.addEventListener('blur', steerBack);
+
+/* ================= scripted demo ================= */
+async function until(fn, max = 600000) { const me = A.demo, t0 = performance.now(); while (!fn()) { if (A.demo !== me || performance.now() - t0 > max) throw new Error('stop'); await sleep(150); } }
+function stopDemo(msg) { A.demo = null; if (msg) toast(msg); render(); }
+async function runDemo() {
+  const me = A.demo = {}; const alive = () => { if (A.demo !== me) throw new Error('stop'); };
+  try {
+    if (A.trip) endTrip(); closeSim(); A.tab = 'home';
+    if (!route()) { A.origin = DEF; toast(`자동 시연: ${DEF.name} → ${DEMO.name} 경로 탐색`); goTo(Object.assign({}, DEMO)); }
+    render(); await until(() => route() && !A.busy, 30000); await Promise.race([route().osm, sleep(8000)]); alive();
+    const first = route().hz.find(h => !TPL[h.tpl].nosim);
+    if (first) { toast('출발 전: 유의지점 시뮬레이션'); await sleep(1200); alive(); simHz(first.id); await sleep(9000); alive(); }
+    toast('안내를 시작하면 영상은 자동으로 닫힙니다'); await sleep(1200); alive(); startTrip(true); ACT.scale(15); await sleep(1500); alive(); cruiseOn();
+    const zoneHz = () => { const T = A.trip, h = zone(); return h && h.m > 600 && h.m < route().len - 600 && T.ann[h.id] && T.ann[h.id].said ? h : null; };
+    await until(() => zoneHz() || A.trip.arrived);
+    if (!A.trip.arrived) {
+      const h = zoneHz(); await until(() => V.m >= h.m - 120 || A.trip.arrived); alive();
+      if (!A.trip.arrived) { toast('유의지점에서 운전자가 브레이크: 개입으로 기록'); setBrake(60); await sleep(1500); setBrake(0); await sleep(1500); alive(); cruiseOn(); ACT.scale(15); }
+    }
+    await until(() => A.trip.arrived); await sleep(3500); alive(); endTrip(); toast('주차 후 주행 리포트'); stopDemo();
+  } catch (e) { if (A.demo === me) stopDemo(e.message === 'stop' ? null : '자동 시연을 진행하지 못했습니다. 인터넷 연결을 확인해 주세요.'); }
+}
+
+/* ================= boot ================= */
+log('App', `레디맵 시작 · 익명 ID ${DB.id}`);
+log('Vehicle', 'checkCruiseControlStateCapabilities() → 지원');
+applyTheme(); render(); setInterval(tick, 100);
+setInterval(() => { if (!document.hidden) loadTraffic(); }, 60000);     // 4분이 지난 정보만 다시 받는다
+window.addEventListener('resize', () => map.resize());
+})();
+</script>
+</body>
+</html>
