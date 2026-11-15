@@ -1002,19 +1002,32 @@ function bump(d) {
   let h = DB.hist.find(x => near(x, d)); if (!h) { h = { name: d.name, sub: d.sub || '', lat: d.lat, lon: d.lon, n: 0 }; DB.hist.push(h); }
   h.n++; h.last = Date.now(); DB.hist.sort((a, b) => b.last - a.last); DB.hist.length = Math.min(DB.hist.length, 20); save();
 }
+/* 위치: 권한을 받으면 앱이 켜져 있는 동안 계속 추적한다(주행 감지 moving()·videoOk()가 이 값을 쓴다) */
+let geoWarned = 0;
+function startWatch() {
+  if (!navigator.geolocation || A.watch != null) return;
+  A.watch = navigator.geolocation.watchPosition(p => onFix(p.coords), e => {
+    if (e.code === 1) { navigator.geolocation.clearWatch(A.watch); A.watch = null; }   // 거부: 권한이 바뀌면 다시 시작
+    if (geoWarned & (1 << e.code)) return; geoWarned |= 1 << e.code;
+    toast(e.code === 1 ? '위치 권한이 꺼져 있습니다. 설정에서 레디맵의 위치를 "앱 사용 중 허용"으로 바꿔 주세요.' : '위치를 찾는 중입니다. 휴대폰의 위치(GPS)가 켜져 있는지 확인해 주세요.');
+  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+}
+function useFix() {
+  A.wantLoc = false;
+  A.origin = { name: '현재 위치', sub: '', lat: A.fix.lat, lon: A.fix.lon, gps: true };
+  log('FusedLocation', `LocationData ${A.origin.lat.toFixed(5)}, ${A.origin.lon.toFixed(5)}`);
+  map.easeTo({ center: [A.origin.lon, A.origin.lat], zoom: 15 }); if (A.dest && !A.trip) loadRoutes(); else render();
+}
 function locate() {
   if (!navigator.geolocation) return toast('이 브라우저는 위치 기능을 지원하지 않습니다');
-  toast('현재 위치를 확인하는 중입니다');
-  navigator.geolocation.getCurrentPosition(p => {
-    A.origin = { name: '현재 위치', sub: '', lat: p.coords.latitude, lon: p.coords.longitude, gps: true }; A.fix = { lat: A.origin.lat, lon: A.origin.lon, speed: 0, t: Date.now() };
-    log('FusedLocation', `LocationData ${A.origin.lat.toFixed(5)}, ${A.origin.lon.toFixed(5)}`);
-    drawMe(); map.easeTo({ center: [A.origin.lon, A.origin.lat], zoom: 15 }); if (A.dest && !A.trip) loadRoutes(); else render();
-  }, () => toast('위치를 가져오지 못했습니다. 출발지는 검색이나 지도에서 정할 수 있습니다.'), { enableHighAccuracy: true, timeout: 9000 });
+  if (fresh()) return useFix();
+  A.wantLoc = true; geoWarned = 0; toast('현재 위치를 확인하는 중입니다'); startWatch();
 }
 function onFix(c) {
   const prev = A.fix, now = Date.now(), lon = c.longitude, lat = c.latitude;
   const sp = c.speed != null && c.speed >= 0 ? c.speed * 3.6 : prev && now > prev.t ? dist([prev.lon, prev.lat], [lon, lat]) / ((now - prev.t) / 1000) * 3.6 : 0;
-  A.fix = { lon, lat, speed: sp, t: now }; drawMe();
+  A.fix = { lon, lat, speed: sp, t: now }; drawMe(); guard();
+  if (!A.trip && (A.wantLoc || (!prev && A.origin === DEF))) useFix();   // 첫 위치(또는 내 위치 버튼) → 출발지
   const T = A.trip, r = route(); if (!T || T.mock || T.arrived || !r) return;
   if (project(r, [lon, lat]).d > 70) { if (++T.off >= 4 && !T.rerouting) reroute(); } else T.off = 0;
 }
@@ -1060,7 +1073,7 @@ function startTrip(mock) {
   bump(A.dest);
   log('Vehicle', 'Gear P → D'); log('UX', 'CarUxRestrictions 활성: UX_RESTRICTIONS_NO_VIDEO · 주행 중 화면 조작 잠금');
   log('App', `${mock ? '모의 주행' : '실제 위치(GPS)'}으로 안내 시작 · 유의지점 ${r.hz.length}곳`);
-  if (!mock) A.watch = navigator.geolocation.watchPosition(p => onFix(p.coords), () => {}, { enableHighAccuracy: true, maximumAge: 1000 });
+  if (!mock) startWatch();
   if (LISTEN_TRIP()) listen(true); keepAwake(true);
   $('#hudTop').appendChild($('#voice')); drawCar(); render();
   speak(`${A.dest.name}까지 경로 안내를 시작합니다.`);
@@ -1068,7 +1081,6 @@ function startTrip(mock) {
 function endTrip() {
   const T = A.trip; if (!T) return;
   T.arrived = true; if (V.cruise !== 'OFF') setCruise('OFF'); listen(false); keepAwake(false);
-  if (A.watch != null) { navigator.geolocation.clearWatch(A.watch); A.watch = null; }
   V.gear = 'P'; V.brake = 0; V.speed = 0; A.checkin = null; A.card = null; unslow();
   log('Vehicle', 'Gear D → P'); log('UX', 'CarUxRestrictions 해제: 정차 전용 화면 사용 가능');
   if (V.m > 300) {
@@ -1651,8 +1663,10 @@ function applyTheme() {
 }
 mqDark.addEventListener && mqDark.addEventListener('change', applyTheme);
 map.on('load', () => {
-  if (navigator.permissions && navigator.geolocation) navigator.permissions.query({ name: 'geolocation' }).then(s => { if (s.state === 'granted') locate(); }).catch(() => {});
+  startWatch();   // 시작하자마자 권한을 묻고, 허용되면 계속 추적
+  if (navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then(s => { s.onchange = () => { if (s.state === 'granted') startWatch(); }; }).catch(() => {});
 });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') startWatch(); });   // 설정에서 권한을 켜고 돌아온 경우
 map.on('click', async e => {            // 지도를 눌러 장소 선택
   if (A.trip || A.busy || (map.getLayer('alts') && map.queryRenderedFeatures(e.point, { layers: ['alts'] }).length)) return;
   const p = { name: '선택한 위치', sub: `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)}`, lat: e.lngLat.lat, lon: e.lngLat.lng };
