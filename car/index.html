@@ -3,15 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>레디맵 차량용</title>
-<meta name="theme-color" content="#f5f5f7">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="레디맵">
-<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<title>AVEN 리허설</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
 <style>
-/* 레디맵 리허설 — 비행 전 브리핑. 화면이 아무리 바빠도 주인공은 하나, 신뢰 리본(맡김·주의·직접)이다.
+/* AVEN 리허설 — 비행 전 브리핑. 화면이 아무리 바빠도 주인공은 하나, 신뢰 리본(맡김·주의·직접)이다.
    크롬은 무채색, 색은 리본과 그 3색이 뜻하는 곳에만 쓴다. 지도 위에 뜨는 판만 옅은 그림자를 둔다. */
 :root{
   --bg:#f5f5f7; --panel:#ffffff; --card:#f5f5f7; --raise:#e8e8ed; --line:#d2d2d7; --hair:rgba(0,0,0,.08);
@@ -250,28 +246,6 @@ input[type=range]{width:100%;accent-color:var(--fg);margin:0}
 .maplibregl-ctrl-bottom-right{right:var(--con);bottom:calc(64px + var(--bot))}
 @media (min-width:760px){ .maplibregl-ctrl-bottom-right{bottom:0} }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
-/* 야간: 전조등이 켜지거나 기기가 어두운 모드면 눈부심을 줄이려고 어두운 화면으로 바꾼다 */
-:root[data-theme="dark"]{
-  --bg:#0b0b0d; --panel:#1c1c1e; --card:#2c2c2e; --raise:#3a3a3c; --line:#48484a; --hair:rgba(255,255,255,.10);
-  --fg:#f5f5f7; --muted:#a1a1a6; --faint:#8e8e93; --accent:#2f8cff; --accent-soft:rgba(47,140,255,.18);
-  --t0:#2f8cff; --t1-ink:#ffb340; --t2-ink:#ff6961; --t0-soft:rgba(47,140,255,.18); --ok:#32d74b; --ok-soft:rgba(50,215,75,.16);
-  --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.5); color-scheme:dark }
-:root[data-theme="dark"] .btn:hover{background:#4a4a4e}
-:root[data-theme="dark"] .btn.primary{color:#0b0b0d} :root[data-theme="dark"] .btn.primary:hover{background:#fff}
-:root[data-theme="dark"] .sim canvas{background:#20262e}
-/* 차량 모니터(가로로 넓고 낮은 화면): 장갑을 낀 손가락으로도 누를 수 있게 터치 영역을 키운다 */
-@media (min-width:1100px) and (max-height:820px){
-  body{font-size:16px} :root{--side:440px}
-  .btn{min-height:52px;font-size:16px;padding:10px 20px;border-radius:26px} .btn.sm{min-height:44px;font-size:15px;padding:6px 16px;border-radius:22px}
-  .seg button{min-height:44px;font-size:15px;padding:6px 16px} .item{min-height:68px} .fab{width:56px;height:56px}
-  .tabs button{font-size:14px} .tog{width:56px;height:32px} .tog::after{width:28px;height:28px} .tog.on::after{transform:translateX(24px)}
-  .hud-top{width:min(520px,calc(100vw - 24px - var(--con)))} .tbt-d{font-size:44px} .tbt-t{font-size:18px} .dcard .big{font-size:22px}
-}
-/* 주행 중 조작 잠금(도로교통법 제49조 제1항 제11호의2) */
-.lockchip{background:var(--t1-soft);color:var(--t1-ink)}
-body.real .sim-ctl{display:none}
-.dico{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--raise);color:var(--fg)}
-.dcard.warn .dico{background:var(--t2-soft);color:var(--t2-ink)} .dcard.l1 .dico{background:var(--t1-soft);color:var(--t1-ink)}
 </style>
 </head>
 <body>
@@ -303,21 +277,18 @@ body.real .sim-ctl{display:none}
 <div class="hud-top" id="hudTop">
   <div class="tbt"><span class="arr" id="tbtIco"></span><div style="min-width:0"><div class="tbt-d" id="tbtDist"></div><div class="tbt-t" id="tbtText"></div></div></div>
   <div class="ahead" id="ahead" hidden></div>
-  <div class="dcard" id="dCard" hidden><span class="dico" id="dIco" aria-hidden="true"></span><div style="min-width:0"><div class="big" id="dBig"></div><div class="note" id="dSub"></div></div></div>
+  <div class="dcard" id="dCard" hidden><div style="min-width:0"><div class="big" id="dBig"></div><div class="note" id="dSub"></div></div></div>
 </div>
 <div class="hud-bot">
   <div class="spd"><div><b id="dSpd">0</b><small>km/h</small></div></div>
   <div class="cam" id="dCam" hidden title="과속 단속 카메라"></div>
   <div class="eta"><div><b id="dEta">--:--</b> 도착 예정</div><div class="note" id="dRemain"></div></div>
   <span class="chip" id="chipCruise">크루즈 꺼짐</span>
-  <span class="chip lockchip" id="chipLock" hidden title="도로교통법 제49조 제1항 제11호의2">주행 중 · 화면 조작 잠김, 음성으로 말씀하세요</span>
   <div class="row">
-    <span class="row sim-ctl" title="모의 주행용 가상 차량 입력(실제 차량에서는 차량 버튼·페달·음성으로 대신함)">
     <button class="btn sm" data-act="cruiseOn" id="qCruise">크루즈 켜기</button>
     <button class="btn sm" data-act="brakeToggle" id="qBrake">브레이크 밟기</button>
     <button class="btn sm" data-act="say" data-arg="준비">“준비”</button>
     <span class="seg" id="qScale"></span>
-    </span>
     <button class="btn sm danger" data-act="end">안내 종료</button>
   </div>
 </div>
@@ -396,11 +367,11 @@ const DEF = { name: '동대구역', sub: '기본 출발지', lat: 35.8797, lon: 
 const DEMO = { name: '수성못', sub: '대구광역시 수성구', lat: 35.8283, lon: 128.6176 };
 function seedDB() {
   return { v: 4, id: 'rm-' + Math.random().toString(36).slice(2, 10), points: [], events: [], trips: [], hist: [], fav: { home: null, work: null },
-    settings: { voice: true, cruiseOnly: true, checkin: true, share: true, cmin: 30, theme: 'auto' } };
+    settings: { voice: true, cruiseOnly: true, checkin: true, share: true, cmin: 10 } };
 }
 let DB = store.get('nav', null); if (!DB || DB.v !== 4) DB = seedDB();
 const save = () => store.set('nav', DB);
-const S = DB.settings; if (!S.theme) S.theme = 'auto';
+const S = DB.settings;
 const rate = p => p.pass ? p.hit / p.pass : 0;
 const isPublic = p => p.veh >= 5 && rate(p) >= 0.08;
 const per100 = v => Math.round(v * 100);
@@ -435,7 +406,6 @@ const fmtDur = s => s >= 3600 ? `${Math.floor(s / 3600)}시간 ${Math.round(s % 
 /* ================= open data: 검색(Photon) · 경로(OSRM) · 도로 시설(Overpass) ================= */
 /* 안드로이드 앱(WebView) 안에서는 교통 API 호출·음성·차량 신호를 Kotlin(window.RMNative)이 맡는다 */
 const NATIVE = !!window.RMNative;
-const NATIVE_KEYS = NATIVE && !(typeof window.RMNative.hasKeys === 'function' && !window.RMNative.hasKeys());   // 팀 APK(키 보관)는 hasKeys가 없어 true
 const nativeCalls = new Map(); let nativeSeq = 0;
 window.RMNativeResolve = (id, status, text) => { const c = nativeCalls.get(id); if (c) { nativeCalls.delete(id); c(status, text); } };
 function nativeJSON(url, opt, ms) {
@@ -518,8 +488,8 @@ const saveKeys = () => store.set('keys', KEYS);
 const CONG = [{ ko: '정보 없음', col: '#94A3B8' }, { ko: '원활', col: '#16A34A' }, { ko: '서행', col: '#EAB308' }, { ko: '지체', col: '#F97316' }, { ko: '정체', col: '#DC2626' }];
 const proxyBase = () => (KEYS.proxy || (location.port === '8787' ? location.origin : '')).replace(/\/+$/, '');
 const viaProxy = url => proxyBase() ? `${proxyBase()}/fetch?url=${encodeURIComponent(url)}` : url;
-const canTmap = () => !!(KEYS.tmap || proxyBase() || NATIVE_KEYS);      // 프록시에 키를 넣어 두었으면 화면에는 키가 없어도 된다
-const canIts = () => !!(KEYS.its || proxyBase() || NATIVE_KEYS);
+const canTmap = () => !!(KEYS.tmap || proxyBase() || NATIVE);      // 프록시에 키를 넣어 두었으면 화면에는 키가 없어도 된다
+const canIts = () => !!(KEYS.its || proxyBase() || NATIVE);
 function trafMsg(e, who) {
   if (e && (e.status === 401 || e.status === 403)) return `${who} 인증키를 확인해 주세요(HTTP ${e.status}).`;
   if (e && e.status === 429) return `${who} 하루 호출 한도를 넘었습니다.`;
@@ -619,7 +589,7 @@ function applyTraffic(r, from = 0, keepTt = false) {
   }
   r.tcum = [0]; for (let j = 0; j < n; j++) r.tcum.push(r.tcum[j] + r.tt[j]);
   r.dur = r.tcum[n];
-  r.jam = jamHz(r);
+  r.jam = jamHz(r, r.cum[from] || 0);
 }
 function cruiseT(r, from = 0) {
   let t = 0;
@@ -631,17 +601,36 @@ function cruiseT(r, from = 0) {
   return t;
 }
 function tAt(r, m) { if (!r.tcum) return r.dur * m / r.len; const i = idxAt(r, m), L = r.cum[i + 1] - r.cum[i] || 1; return r.tcum[i] + (r.tcum[i + 1] - r.tcum[i]) * clamp((m - r.cum[i]) / L, 0, 1); }
-function jamHz(r) {
-  const out = [], n = r.tf.length; let i = 0;
+/* 정체 꼬리 판정: 혼잡도 등급(도로 종류마다 기준 속도가 다름) 대신 실제 속도 차이로 본다.
+   - 정보없음(0)·속도 없는 구간은 '모름'으로 두고 판단에 쓰지 않는다
+   - 정체 구간: 30km/h 이하가 150m 이상 이어짐
+   - 꼬리: 바로 앞 500m 평균 속도가 정체 속도보다 20km/h 이상, 1.8배 이상 빠름(데이터가 앞 구간의 절반 이상 있을 때만)
+   - 15분 안에 도착하는 정체만 안내(멀리 있는 정체는 그때쯤 풀릴 수 있음)
+   - 안내 거리 = 편안한 감속(0.6m/s²)으로 줄일 거리 + 반응 2초, 300m~1.2km */
+const JAM = { vMax: 30, minLen: 150, look: 500, dvMin: 20, ratio: 1.8, known: 0.5, horizon: 900, decel: 0.6, react: 2 };
+function segV(r, j) { return r.tf && r.tf[j] > 0 && r.tsp && r.tsp[j] > 3 ? r.tsp[j] : null; }
+function jamWarn(vu, vj) { const a = vu / 3.6, b = vj / 3.6; return clamp(Math.ceil(((a * a - b * b) / (2 * JAM.decel) + a * JAM.react) / 100) * 100, 300, 1200); }
+function jamHz(r, fromM = 0) {
+  const out = [], n = r.tf ? r.tf.length : 0; let i = 0;
+  const t0 = r.tcum ? tAt(r, fromM) : 0;
   while (i < n) {
-    if (r.tf[i] < 3) { i++; continue; }
-    let j = i, worst = 0; while (j < n && (r.tf[j] >= 3 || (r.tf[j] === 2 && j + 1 < n && r.tf[j + 1] >= 3))) { worst = Math.max(worst, r.tf[j]); j++; }
-    const m = r.cum[i], len = r.cum[j] - m;
-    let pre = 0, preLen = 0; for (let k = i - 1; k >= 0 && m - r.cum[k] < 500; k--) { const L = r.cum[k + 1] - r.cum[k]; pre += (r.tf[k] || 1) * L; preLen += L; }
-    const flowing = !preLen || pre / preLen <= 2.2;          // 앞이 원활하다가 갑자기 막히는 곳 = 정체 꼬리
-    if (len >= 150 && m > 200 && m < r.len - 150 && flowing) {
+    const v0 = segV(r, i); if (v0 == null || v0 > JAM.vMax) { i++; continue; }
+    let j = i, sv = 0, sl = 0, worst = 0;
+    while (j < n) {
+      const v = segV(r, j), L = r.cum[j + 1] - r.cum[j];
+      const bridge = (v == null || v <= JAM.vMax + 10) && L < 40 && j + 1 < n && (segV(r, j + 1) ?? 99) <= JAM.vMax;
+      if (!((v != null && v <= JAM.vMax) || bridge)) break;
+      if (v != null) { sv += v * L; sl += L; } worst = Math.max(worst, r.tf[j]); j++;
+    }
+    const m = r.cum[i], len = r.cum[j] - m, vj = sl ? sv / sl : v0;
+    let pv = 0, pk = 0, pl = 0;
+    for (let k = i - 1; k >= 0 && m - r.cum[k] < JAM.look; k--) { const L = r.cum[k + 1] - r.cum[k], v = segV(r, k); pl += L; if (v != null) { pv += v * L; pk += L; } }
+    const vu = pk ? pv / pk : 0;
+    const tail = pl > 0 && pk >= pl * JAM.known && vu - vj >= JAM.dvMin && vu >= vj * JAM.ratio;
+    const soon = !r.tcum || tAt(r, m) - t0 <= JAM.horizon;
+    if (len >= JAM.minLen && m > 200 && m < r.len - 150 && m > fromM && tail && soon) {
       const road = (r.steps.filter(s => s.m <= m && s.name).pop() || {}).name;
-      out.push({ m, tpl: 'jam', name: `${road ? road + ' ' : ''}${worst >= 4 ? '정체' : '지체'} 시작 · 약 ${fmtDist(len)}`, cong: worst, jlen: len, live: true });
+      out.push({ m, tpl: 'jam', name: `${road ? road + ' ' : ''}${worst >= 4 ? '정체' : '지체'} 시작 · 약 ${fmtDist(len)}`, cong: worst, jlen: len, live: true, vu: Math.round(vu), vj: Math.round(vj), warn: jamWarn(vu, vj) });
     }
     i = j;
   }
@@ -701,7 +690,7 @@ async function refreshTraffic() {
   trafBusy = true; const before = r.dur - tAt(r, V.m), from = idxAt(r, V.m);
   try {
     const p = posAt(r, V.m), n = await fetchTmap({ lon: p[0], lat: p[1] }, A.dest); if (A.trip !== T || route() !== r) return;
-    projectTraffic(n, r, from); applyTraffic(r, from); r.trafAt = Date.now();
+    projectTraffic(n, r, from); applyTraffic(r, from); if (r.src !== 'tmap' && r.osrmK) calibrate(r, r.osrmK); r.trafAt = Date.now();
     r.raw = r.raw.filter(h => h.tpl !== 'jam' || h.m < V.m + 400).concat(r.jam.filter(h => h.m >= V.m + 400));
     if (canIts()) await ensureLive(r, true); else { finalize(r); drawRoutes(); }
     const after = r.dur - tAt(r, V.m), diff = Math.round((after - before) / 60);
@@ -849,27 +838,8 @@ function ensureOSM(r) {
 const V = { gear: 'P', cruise: 'OFF', target: 100, brake: 0, steer: 0, signal: 'OFF', wiper: 'OFF', light: 'OFF', m: 0, speed: 0, simT: 0, scale: 1 };
 const A = { tab: 'home', origin: DEF, dest: null, sel: null, results: null, routes: [], ri: 0, busy: null, err: null, trip: null, viewed: new Set(), sim: null, queue: [],
   checkin: null, lastTrip: null, card: null, mine: false, confirmReset: false, mute: false, demo: null, collapsed: false, console: innerWidth >= 1100, fix: null, watch: null };
-/* 주행 상태 판단. 영상은 '주차(P)'에서만, 화면 조작은 '움직이는 중'에만 막는다.
-   - 차량(Kotlin): RMVehicle.update({ ux, gear, speed })  ux = CarUxRestrictions 활성 비트(16 = NO_VIDEO)
-   - 모의 주행: 가상 콘솔의 기어·속도
-   - 휴대폰 웹: GPS 속도(15초 안의 값) */
-const fresh = () => A.fix && Date.now() - A.fix.t < 15000;
-function videoOk() {
-  const n = A.nv;
-  if (n && n.ux != null) return (n.ux & 16) === 0;
-  if (n && n.gear) return n.gear === 'P' && !(n.speed > 1);
-  if (A.trip) return false;                                  // 안내 중에는 신호 대기로 멈춰 있어도 재생하지 않는다(재생 중 출발 방지)
-  return !(fresh() && A.fix.speed > 5);
-}
-function moving() {
-  const n = A.nv;
-  if (n && n.speed != null) return n.speed > 3;
-  if (n && n.ux != null) return (n.ux & 16) !== 0;
-  if (A.trip && A.trip.mock) return !A.trip.arrived && V.speed > 3;
-  return !!(fresh() && A.fix.speed > 8);
-}
 const isRain = () => V.wiper !== 'OFF';
-const isNight = () => V.light === 'LOW' || !!(A.nv && A.nv.night);
+const isNight = () => V.light === 'LOW';
 const env = () => ({ rain: isRain(), night: isNight() });
 const route = () => A.routes[A.ri] || null;
 const ptOf = h => h && h.pid ? DB.points.find(p => p.id === h.pid) : null;
@@ -918,12 +888,9 @@ window.RMVehicle = { update(o) {
   if (o.brake != null && o.brake !== nativeLast.brake) { nativeLast.brake = o.brake; setBrake(o.brake ? 60 : 0); }
   if (typeof o.steer === 'number' && Math.round(o.steer) !== nativeLast.steer) { nativeLast.steer = Math.round(o.steer); V.steer = nativeLast.steer; syncConsole(); }
   if (o.signal && o.signal !== nativeLast.signal) { nativeLast.signal = o.signal; V.signal = o.signal; syncConsole(); }
-  const nv = A.nv = A.nv || {};
-  if (o.gear) nv.gear = o.gear; if (typeof o.speed === 'number') nv.speed = o.speed; if (typeof o.ux === 'number') nv.ux = o.ux;
-  if (o.light) { V.light = o.light; nv.night = o.light === 'LOW'; }
-  if (o.wiper) V.wiper = o.wiper;
-  guard();
 } };
+/* Kotlin(UxRestrictionBridge)이 CarUxRestrictions 변화를 RMUx.update({ restricted })로 보낸다. 이 화면에는 주행 잠금이 없어 로그만 남긴다 */
+window.RMUx = { update(o) { const v = !!(o && o.restricted); if (v !== window.RMUx.last) { window.RMUx.last = v; log('UX', v ? 'CarUxRestrictions 활성(주행 중)' : 'CarUxRestrictions 해제(정차)'); } } };
 function snapshot() {
   const r = route(), p = posAt(r, V.m);
   return { m: Math.round(V.m), lat: +p[1].toFixed(5), lon: +p[0].toFixed(5), heading: Math.round(headAt(r, V.m)), signal: V.signal, wiper: V.wiper, light: V.light, target: V.target, speed: Math.round(V.speed), rain: isRain(), night: isNight() };
@@ -939,7 +906,6 @@ function onCruiseChange(prev, next) {
     const w = inputs.filter(i => i.t >= t0 - 2000 && i.t <= t0 + 2100);
     const maxB = Math.max(0, ...w.map(i => i.b)), ss = w.map(i => i.s);
     const dS = ss.length ? Math.max(...ss) - Math.min(...ss) : 0;
-    if (maxB <= 5 && dS > 15 && w.some(i => i.g && i.g !== 'OFF')) { log('App', '방향지시등을 켠 조향: 계획된 차로 변경으로 보고 개입 기록에서 제외'); return; }
     if (maxB > 5 || dS > 15) record('driver', Object.assign(snap, { brake: Math.round(maxB), steer: Math.round(dS), by: maxB > 5 ? 'brake' : 'steer' }));
     else log('App', '버튼으로 크루즈 해제: 페달·조향 입력 없음 → 기록 제외');
   }, 2100);
@@ -974,6 +940,21 @@ function record(kind, snap) {
 }
 
 /* ---------- destination, route ---------- */
+/* 대안 경로 시간 보정: 대안(OSRM)은 TMAP 소통정보가 없는 구간을 신호 대기 없는 자유 주행 속도로 계산해 늘 짧게 나온다.
+   같은 길의 OSRM 시간 대비 TMAP 시간 비율(K)로, 소통정보가 없는 구간만 늘려 TMAP 경로와 같은 기준으로 비교한다.
+   같은 길이 없으면 두 결과의 1km당 소요 시간 비율을 쓴다. K는 1~2로 제한(대안을 더 빠르게 만들지는 않는다) */
+function osrmK(tm, twin, os) {
+  const base = twin || os[0]; if (!base || !base.dur || !tm.dur) return 1;
+  const k = twin ? tm.dur / twin.dur : (tm.dur / tm.len) / (base.dur / base.len);
+  log('TMAP', `대안 경로 시간 보정 ×${k.toFixed(2)} (${twin ? '같은 길 OSRM 대비' : '1km당 소요 시간 대비'})`);
+  return clamp(k, 1, 2);
+}
+function calibrate(r, k) {
+  if (!(k > 1) || !r.tt) return; r.osrmK = k;
+  const n = r.tt.length; for (let j = 0; j < n; j++) if (!(r.tf && r.tf[j] > 0)) r.tt[j] *= k;
+  r.tcum = [0]; for (let j = 0; j < n; j++) r.tcum.push(r.tcum[j] + r.tt[j]);
+  r.dur = r.tcum[n]; r.jam = jamHz(r);
+}
 async function loadRoutes() {
   A.routes = []; A.ri = 0; A.err = null; A.trafErr = null; A.results = null; A.busy = canTmap() ? '실시간 교통을 반영해 경로를 찾는 중입니다…' : '경로를 찾는 중입니다…'; A.tab = 'home'; A.collapsed = false; A.viewed.clear(); drawRoutes(); render();
   try {
@@ -981,12 +962,14 @@ async function loadRoutes() {
     const [os, tm] = await Promise.all([fetchRoutes([A.origin, A.dest]).catch(e => { if (!canTmap()) throw e; return []; }), tmP]);
     let rs = os;
     if (tm) {
-      rs = rs.filter(r => { const hit = projectTraffic(tm, r); return !(hit > 0.92 && Math.abs(r.len - tm.len) / tm.len < 0.06); });   // TMAP 경로와 사실상 같은 OSRM 경로는 뺀다
+      let twin = null;
+      rs = rs.filter(r => { const hit = projectTraffic(tm, r); const same = hit > 0.92 && Math.abs(r.len - tm.len) / tm.len < 0.06; if (same && !twin) twin = r; return !same; });   // TMAP 경로와 사실상 같은 OSRM 경로는 뺀다
+      tm.osrmK = osrmK(tm, twin, os);
       rs.forEach(r => { r.src = 'part'; r.trafAt = tm.trafAt; });
       rs.unshift(tm); log('TMAP', `실시간 교통 경로 ${fmtDist(tm.len)} · ${fmtDur(tm.dur)} · 정체·지체 ${fmtDist(trafSummary(tm)[3] + trafSummary(tm)[4])}`);
     } else if (KEYS.sample) rs.forEach(sampleTraffic);
     if (!rs.length) throw new Error('no route');
-    rs.forEach(r => { applyTraffic(r, 0, r.src === 'tmap'); r.raw = detectLocal(r).concat(r.jam || []); finalize(r); });
+    rs.forEach(r => { applyTraffic(r, 0, r.src === 'tmap'); if (tm && r.src === 'part') calibrate(r, tm.osrmK); r.raw = detectLocal(r).concat(r.jam || []); finalize(r); });
     A.routes = rs; A.busy = null;
     log('NaviHelper', `onRouteStarted(${A.dest.name}, ${fmtDist(rs[0].len)}) · onTripInfo`);
     log('App', `경로 ${rs.length}개 · 유의지점 ${rs[0].hz.length}곳 추출`);
@@ -1002,32 +985,19 @@ function bump(d) {
   let h = DB.hist.find(x => near(x, d)); if (!h) { h = { name: d.name, sub: d.sub || '', lat: d.lat, lon: d.lon, n: 0 }; DB.hist.push(h); }
   h.n++; h.last = Date.now(); DB.hist.sort((a, b) => b.last - a.last); DB.hist.length = Math.min(DB.hist.length, 20); save();
 }
-/* 위치: 권한을 받으면 앱이 켜져 있는 동안 계속 추적한다(주행 감지 moving()·videoOk()가 이 값을 쓴다) */
-let geoWarned = 0;
-function startWatch() {
-  if (!navigator.geolocation || A.watch != null) return;
-  A.watch = navigator.geolocation.watchPosition(p => onFix(p.coords), e => {
-    if (e.code === 1) { navigator.geolocation.clearWatch(A.watch); A.watch = null; }   // 거부: 권한이 바뀌면 다시 시작
-    if (geoWarned & (1 << e.code)) return; geoWarned |= 1 << e.code;
-    toast(e.code === 1 ? '위치 권한이 꺼져 있습니다. 설정에서 레디맵의 위치를 "앱 사용 중 허용"으로 바꿔 주세요.' : '위치를 찾는 중입니다. 휴대폰의 위치(GPS)가 켜져 있는지 확인해 주세요.');
-  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
-}
-function useFix() {
-  A.wantLoc = false;
-  A.origin = { name: '현재 위치', sub: '', lat: A.fix.lat, lon: A.fix.lon, gps: true };
-  log('FusedLocation', `LocationData ${A.origin.lat.toFixed(5)}, ${A.origin.lon.toFixed(5)}`);
-  map.easeTo({ center: [A.origin.lon, A.origin.lat], zoom: 15 }); if (A.dest && !A.trip) loadRoutes(); else render();
-}
 function locate() {
   if (!navigator.geolocation) return toast('이 브라우저는 위치 기능을 지원하지 않습니다');
-  if (fresh()) return useFix();
-  A.wantLoc = true; geoWarned = 0; toast('현재 위치를 확인하는 중입니다'); startWatch();
+  toast('현재 위치를 확인하는 중입니다');
+  navigator.geolocation.getCurrentPosition(p => {
+    A.origin = { name: '현재 위치', sub: '', lat: p.coords.latitude, lon: p.coords.longitude, gps: true }; A.fix = { lat: A.origin.lat, lon: A.origin.lon, speed: 0, t: Date.now() };
+    log('FusedLocation', `LocationData ${A.origin.lat.toFixed(5)}, ${A.origin.lon.toFixed(5)}`);
+    drawMe(); map.easeTo({ center: [A.origin.lon, A.origin.lat], zoom: 15 }); if (A.dest && !A.trip) loadRoutes(); else render();
+  }, () => toast('위치를 가져오지 못했습니다. 출발지는 검색이나 지도에서 정할 수 있습니다.'), { enableHighAccuracy: true, timeout: 9000 });
 }
 function onFix(c) {
   const prev = A.fix, now = Date.now(), lon = c.longitude, lat = c.latitude;
   const sp = c.speed != null && c.speed >= 0 ? c.speed * 3.6 : prev && now > prev.t ? dist([prev.lon, prev.lat], [lon, lat]) / ((now - prev.t) / 1000) * 3.6 : 0;
-  A.fix = { lon, lat, speed: sp, t: now }; drawMe(); guard();
-  if (!A.trip && (A.wantLoc || (!prev && A.origin === DEF))) useFix();   // 첫 위치(또는 내 위치 버튼) → 출발지
+  A.fix = { lon, lat, speed: sp, t: now }; drawMe();
   const T = A.trip, r = route(); if (!T || T.mock || T.arrived || !r) return;
   if (project(r, [lon, lat]).d > 70) { if (++T.off >= 4 && !T.rerouting) reroute(); } else T.off = 0;
 }
@@ -1042,25 +1012,6 @@ async function reroute() {
   } catch (e) { toast('경로를 다시 찾지 못했습니다'); } finally { T.rerouting = false; }
 }
 
-/* ---------- 주행 규제: 매 틱 영상·조작 상태를 맞춘다 ---------- */
-let lockWas = null;
-function guard() {
-  if (A.sim && !videoOk()) { closeSim(); log('App', 'stopPlayingVideo(): 주행이 감지되어 리허설 중지'); toast('출발이 감지되어 리허설을 멈췄습니다'); render(); }
-  const lk = moving(); if (lk !== lockWas) { lockWas = lk; document.body.classList.toggle('locked', lk); const c = $('#chipLock'); if (c) c.hidden = !lk; $('#q').readOnly = lk; }
-  document.body.classList.toggle('real', !!(A.trip && !A.trip.mock));
-}
-/* 화면 꺼짐 방지(Wake Lock: Android Chrome, iOS 16.4+ Safari) */
-let wakeLock = null;
-async function keepAwake(on) {
-  try { if (!on) { if (wakeLock) await wakeLock.release(); wakeLock = null; return; } if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) { /* not supported */ }
-}
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && A.trip && !A.trip.arrived) keepAwake(true); });
-/* iOS Safari는 사용자가 한 번 누른 뒤에만 음성을 낸다: 첫 터치 때 소리 없는 문장으로 음성 엔진을 깨운다 */
-document.addEventListener('pointerdown', function prime() {
-  document.removeEventListener('pointerdown', prime);
-  try { if (!NATIVE && 'speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'ko-KR'; speechSynthesis.speak(u); } } catch (e) { /* ignore */ }
-}, { passive: true });
-
 /* ---------- trip lifecycle ---------- */
 function startTrip(mock) {
   const r = route(); if (!r) return toast('목적지를 먼저 정해 주세요');
@@ -1071,16 +1022,16 @@ function startTrip(mock) {
   A.trip = { mock, cruiseSec: 0, cruiseSince: null, events: [], ann: {}, ready: [], hard: {}, checkins: [], silent: 0, waypoint: null, zone: null, arrived: false, rain: isRain(), night: isNight(), off: 0, dest: A.dest.name, gm: 0, gc: 0, pct: r.trust ? r.trust.pct : null };
   $('#ahead').dataset.k = '';
   bump(A.dest);
-  log('Vehicle', 'Gear P → D'); log('UX', 'CarUxRestrictions 활성: UX_RESTRICTIONS_NO_VIDEO · 주행 중 화면 조작 잠금');
+  log('Vehicle', 'Gear P → D'); log('UX', 'CarUxRestrictions 활성: UX_RESTRICTIONS_NO_VIDEO');
   log('App', `${mock ? '모의 주행' : '실제 위치(GPS)'}으로 안내 시작 · 유의지점 ${r.hz.length}곳`);
-  if (!mock) startWatch();
-  if (LISTEN_TRIP()) listen(true); keepAwake(true);
+  if (!mock) A.watch = navigator.geolocation.watchPosition(p => onFix(p.coords), () => {}, { enableHighAccuracy: true, maximumAge: 1000 });
   $('#hudTop').appendChild($('#voice')); drawCar(); render();
   speak(`${A.dest.name}까지 경로 안내를 시작합니다.`);
 }
 function endTrip() {
   const T = A.trip; if (!T) return;
-  T.arrived = true; if (V.cruise !== 'OFF') setCruise('OFF'); listen(false); keepAwake(false);
+  T.arrived = true; if (V.cruise !== 'OFF') setCruise('OFF');
+  if (A.watch != null) { navigator.geolocation.clearWatch(A.watch); A.watch = null; }
   V.gear = 'P'; V.brake = 0; V.speed = 0; A.checkin = null; A.card = null; unslow();
   log('Vehicle', 'Gear D → P'); log('UX', 'CarUxRestrictions 해제: 정차 전용 화면 사용 가능');
   if (V.m > 300) {
@@ -1132,17 +1083,15 @@ function checks(prev, now) {
   });
   for (const h of r.hz) {
     if (h.tpl !== 'cam' && crossed(prev, now, h.m - 1000) && S.checkin && cruising && !T.ann[h.id] && T.cruiseSince != null && (V.simT - T.cruiseSince) / 60 >= S.cmin) startCheckin(h);
-    const W = h.live ? 700 : 300;             // 정체 꼬리·돌발상황은 멈춰 선 차를 만나므로 700m 앞에서 알린다
+    const W = h.live ? (h.warn || 700) : 300;   // 정체 꼬리는 속도 차이로 계산한 거리(300m~1.2km), 돌발상황은 700m 앞에서 알린다
     if (crossed(prev, now, Math.max(1, h.m - W))) {
       log('FusedLocation', `ProximityAlert ENTER · ${h.name} (반경 ${W}m)`);
       if (h.tpl !== 'cam') T.zone = h.id;
       if (S.cruiseOnly && !cruising) { T.silent++; log('App', '크루즈 미작동: 설정에 따라 안내하지 않음'); continue; }
       const a = T.ann[h.id] = T.ann[h.id] || { checkin: false }; if (a.said) continue; a.said = true;
-      const d = h.live ? clamp(Math.ceil((h.m - now) / 100) * 100, 100, 700) : clamp(Math.ceil((h.m - now) / 50) * 50, 50, 300);
+      const d = h.live ? clamp(Math.ceil((h.m - now) / 100) * 100, 100, h.warn || 700) : clamp(Math.ceil((h.m - now) / 50) * 50, 50, 300);
       if (!A.checkin) A.card = { cls: h.lv === 2 ? 'warn' : h.lv ? 'l1' : 'ask', hid: h.id, short: TPL[h.tpl].short, sub: `${h.lv === 2 ? '직접 운전 구간' : h.lv ? '주의 구간' : '안내'}${h.name === TPL[h.tpl].short ? '' : ', ' + h.name}${A.viewed.has(h.id) ? ', 리허설 완료' : ''}` };
-      if (!S.voice) log('App', '음성 안내 꺼짐: 화면 카드만 표시');
-      else if (h.lv === 1 && T.lastL1 != null && V.simT - T.lastL1 < 60) log('App', `주의 안내 상한: 1분 안에 이미 안내해 ${h.name}은 화면 카드만 표시`);
-      else { if (h.lv === 1) T.lastL1 = V.simT; speak(hzSay(h, d, cruising), true); slow(); }
+      if (S.voice) { speak(hzSay(h, d, cruising), true); slow(); } else log('App', '음성 안내 꺼짐: 화면 카드만 표시');
     }
     if (crossed(prev, now, h.m - 150) && cruising) { const p = ptOf(h); if (p && p.mine) p.mp = (p.mp || 0) + 1; }   // 내가 크루즈로 지난 횟수
     if (crossed(prev, now, h.m - 150) && cruising && S.share) { const p = ptOf(h); if (p) { p.pass++; if (isRain()) p.rp++; if (isNight()) p.np++; } }
@@ -1165,7 +1114,7 @@ function startCheckin(h) {
   slow(); A.checkin = { hid: h.id, stage: 1, until: performance.now() + 8000, t0: performance.now() };
   log('App', `단조 주행 ${Math.round((V.simT - A.trip.cruiseSince) / 60)}분: 음성 체크인 시작`);
   speak(`곧 ${TPL[h.tpl].short}입니다. 준비되셨으면 준비라고 말씀해 주세요.`, true);
-  log('SpeechToText', '음성 응답 대기'); listen(true); A.card = { cls: 'ask', text: '“준비”라고 말씀해 주세요', sub: `1km 앞 · ${h.name}` };
+  log('SpeechToText', '음성 응답 대기'); A.card = { cls: 'ask', text: '“준비”라고 말씀해 주세요', sub: `1km 앞 · ${h.name}` };
 }
 function checkinTick() {
   const c = A.checkin; if (!c || performance.now() < c.until) return;
@@ -1175,29 +1124,7 @@ function checkinTick() {
     log('App', '응답 없음: 안내를 한 단계 높임');
     speak(`응답이 없습니다. 전방을 주시해 주세요.${c.rest ? ` 약 ${fmtDist(c.rest.m - V.m).replace('km', '킬로미터').replace('m', '미터')} 앞 ${c.rest.name}를 경유지로 추가할까요?` : ''}`, true, true);
     A.card = { cls: 'warn', text: c.rest ? `${c.rest.name}를 경유지로 추가할까요?` : '전방을 주시해 주세요', sub: c.rest ? '“네”라고 답하면 추가합니다' : '' };
-  } else { T.checkins.push({ hid: c.hid, ok: false }); A.checkin = null; if (!LISTEN_TRIP()) listen(false); if (A.card && !A.card.hid) A.card = null; log('App', '체크인 무응답으로 종료: 300m 앞에서 다시 안내'); }
-}
-const heardWord = t => /위험/.test(t) ? '위험' : /준비/.test(t) ? '준비' : /^(네|예|응)|추가/.test(t) ? '네' : null;
-function heard(text) {
-  if (!NATIVE) try { if (speechSynthesis.speaking) return; } catch (e) { /* ignore */ }   // 안내 음성이 마이크로 다시 들어온 것은 무시
-  const t = String(text || '').replace(/\s+/g, ''), w = heardWord(t); if (!w) return;
-  if (w === '네' && !(A.checkin && A.checkin.stage === 2)) return;
-  if (w === '준비' && !A.checkin) return;
-  onVoice(w);
-}
-window.RMVoiceText = heard;                                    // Kotlin SpeechRecognizer 결과
-let rec = null;
-const LISTEN_TRIP = () => !NATIVE;                             // 웹은 주행 내내 듣고, 네이티브는 체크인 때만 마이크를 연다
-function listen(on) {
-  if (NATIVE) { try { if (on && window.RMNative.listen) window.RMNative.listen(); else if (!on && window.RMNative.stopListen) window.RMNative.stopListen(); } catch (e) { /* ignore */ } return; }
-  if (!SR || location.protocol === 'file:') return;
-  if (!on) { const r = rec; rec = null; if (r) try { r.abort(); } catch (e) { /* ignore */ } return; }
-  if (rec) return;
-  const r = rec = new SR(); r.lang = 'ko-KR'; r.continuous = true; r.interimResults = false;
-  r.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) { log('SpeechToText', `“${e.results[i][0].transcript}”`); heard(e.results[i][0].transcript); } };
-  r.onerror = ev => { if (/not-allowed|service-not-allowed/.test(ev.error)) { rec = null; toast('마이크 권한이 없어 음성 응답을 쓸 수 없습니다'); } };
-  r.onend = () => { if (rec === r) setTimeout(() => { if (rec === r) try { r.start(); } catch (e) { /* ignore */ } }, 400); };
-  try { r.start(); log('SpeechToText', '핸즈프리 음성 응답 대기: “준비”, “여기 위험해”'); } catch (e) { rec = null; }
+  } else { T.checkins.push({ hid: c.hid, ok: false }); A.checkin = null; if (A.card && !A.card.hid) A.card = null; log('App', '체크인 무응답으로 종료: 300m 앞에서 다시 안내'); }
 }
 function onVoice(w) {
   log('SpeechToText', `인식 결과: “${w === '위험' ? '여기 위험해' : w}”`);
@@ -1207,10 +1134,10 @@ function onVoice(w) {
   if (w === '준비') {
     T.ann[c.hid] = Object.assign(T.ann[c.hid] || {}, { checkin: true }); T.checkins.push({ hid: c.hid, ok: true, sec: +((performance.now() - c.t0) / 1000).toFixed(1) });
     T.cruiseSince = V.simT;   // 응답을 받았으므로 단조 주행 시간을 다시 센다
-    A.checkin = null; if (!LISTEN_TRIP()) listen(false); A.card = { cls: 'ok', text: '확인했습니다', sub: '준비 상태로 통과합니다' }; speak('확인했습니다.', true);
+    A.checkin = null; A.card = { cls: 'ok', text: '확인했습니다', sub: '준비 상태로 통과합니다' }; speak('확인했습니다.', true);
   } else if (w === '네' && c.stage === 2 && c.rest) {
     T.waypoint = c.rest; T.checkins.push({ hid: c.hid, ok: false, rest: true });
-    A.checkin = null; if (!LISTEN_TRIP()) listen(false); A.card = { cls: 'ok', text: `${c.rest.name} 경유지 추가`, sub: '도착하면 알려 드립니다' };
+    A.checkin = null; A.card = { cls: 'ok', text: `${c.rest.name} 경유지 추가`, sub: '도착하면 알려 드립니다' };
     log('NaviHelper', `addWaypoint(${c.rest.name})`); speak(`${c.rest.name}를 경유지로 추가했습니다.`, true);
   }
 }
@@ -1224,8 +1151,8 @@ function addOthers() {
 let lastTick = performance.now();
 function tick() {
   const t = performance.now(), real = Math.min(1, (t - lastTick) / 1000); lastTick = t;
-  inputs.push({ t, b: V.brake, s: V.steer, g: V.signal }); if (inputs.length > 120) inputs.shift();
-  vehicleRules(); guard();
+  inputs.push({ t, b: V.brake, s: V.steer }); if (inputs.length > 120) inputs.shift();
+  vehicleRules();
   const T = A.trip, r = route();
   if (T && r && !T.arrived) {
     const dt = real * (T.mock ? V.scale : 1), prev = V.m;
@@ -1614,7 +1541,7 @@ function playSim() {
   step();
 }
 function openSim(tpl, title, kind, e) {
-  if (!videoOk()) { log('UX', 'UX_RESTRICTIONS_NO_VIDEO: 리허설 재생 거부'); return toast('리허설 영상은 주차(P) 상태에서만 볼 수 있습니다'); }
+  if (A.trip) return toast('주행 중에는 영상을 재생할 수 없습니다');
   A.sim = { tpl, env: e }; $('#simTitle').textContent = title; $('#simKind').textContent = `${kind}, ${TPL[tpl].label}`;
   $('#simEnv').innerHTML = `<span class="chip">${e.rain ? '우천' : '맑음'}</span><span class="chip">${e.night ? '야간' : '주간'}</span>`;
   $('#simNext').hidden = !A.queue.length; $('#simModal').hidden = false;
@@ -1631,14 +1558,12 @@ function simHz(id, queued) {
 function nextSim() { const id = A.queue.shift(); if (id) simHz(id, true); else closeSim(); }
 
 /* ================= map ================= */
-const mqDark = matchMedia('(prefers-color-scheme: dark)');
-const wantDark = () => S.theme === 'dark' || (S.theme === 'auto' && (isNight() || mqDark.matches));
-let dark = wantDark(); document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+const dark = false;   // 시연 화면 기준으로 밝은 지도 고정
 const map = new maplibregl.Map({ container: 'map', style: `https://tiles.openfreemap.org/styles/${dark ? 'dark' : 'liberty'}`, bounds: [[125.3, 33.1], [129.9, 38.6]], fitBoundsOptions: { padding: innerWidth >= 760 ? { left: 410, top: 20, right: 20, bottom: 20 } : { top: 110, bottom: Math.round(innerHeight * 0.4), left: 10, right: 10 } }, maxPitch: 60, attributionControl: { compact: true } });
 const MK = { hz: [], pts: [], o: null, d: null, car: null, me: null, sel: null };
 const fc = fs => ({ type: 'FeatureCollection', features: fs });
 const lineF = (c, props) => ({ type: 'Feature', properties: props || {}, geometry: { type: 'LineString', coordinates: c } });
-function setupLayers() {
+map.on('load', () => {
   for (const l of map.getStyle().layers)      // 지명을 한글로 표시
     if (l.type === 'symbol' && l.layout && l.layout['text-field'] && JSON.stringify(l.layout['text-field']).includes('name')) map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]);
   const before = (map.getStyle().layers.find(l => l.type === 'symbol') || {}).id, lay = { 'line-cap': 'round', 'line-join': 'round' };
@@ -1648,25 +1573,11 @@ function setupLayers() {
   map.addLayer({ id: 'route', type: 'line', source: 'route', layout: lay, paint: { 'line-color': TCOL[0], 'line-width': 7 } }, before);
   map.addSource('traffic', { type: 'geojson', data: fc([]) });
   map.addLayer({ id: 'traffic', type: 'line', source: 'traffic', layout: lay, paint: { 'line-color': ['get', 'col'], 'line-width': 7 } }, before);
-  if (dark) map.setPaintProperty('route-case', 'line-color', '#0b0b0d');
+  map.on('click', 'alts', e => ACT.pick(e.features[0].properties.i));
+  map.on('mouseenter', 'alts', () => { map.getCanvas().style.cursor = 'pointer'; }); map.on('mouseleave', 'alts', () => { map.getCanvas().style.cursor = ''; });
   drawRoutes();
-}
-map.on('style.load', setupLayers);
-map.on('click', 'alts', e => ACT.pick(e.features[0].properties.i));
-map.on('mouseenter', 'alts', () => { map.getCanvas().style.cursor = 'pointer'; }); map.on('mouseleave', 'alts', () => { map.getCanvas().style.cursor = ''; });
-function applyTheme() {
-  const d = wantDark(); if (d === dark) return; dark = d;
-  document.documentElement.dataset.theme = d ? 'dark' : 'light';
-  document.querySelector('meta[name=theme-color]').content = d ? '#0b0b0d' : '#f5f5f7';
-  map.setStyle(`https://tiles.openfreemap.org/styles/${d ? 'dark' : 'liberty'}`, { diff: false });
-  log('App', d ? '야간: 어두운 화면으로 전환' : '주간: 밝은 화면으로 전환');
-}
-mqDark.addEventListener && mqDark.addEventListener('change', applyTheme);
-map.on('load', () => {
-  startWatch();   // 시작하자마자 권한을 묻고, 허용되면 계속 추적
-  if (navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then(s => { s.onchange = () => { if (s.state === 'granted') startWatch(); }; }).catch(() => {});
+  if (navigator.permissions && navigator.geolocation) navigator.permissions.query({ name: 'geolocation' }).then(s => { if (s.state === 'granted') locate(); }).catch(() => {});
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') startWatch(); });   // 설정에서 권한을 켜고 돌아온 경우
 map.on('click', async e => {            // 지도를 눌러 장소 선택
   if (A.trip || A.busy || (map.getLayer('alts') && map.queryRenderedFeatures(e.point, { layers: ['alts'] }).length)) return;
   const p = { name: '선택한 위치', sub: `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)}`, lat: e.lngLat.lat, lon: e.lngLat.lng };
@@ -1744,7 +1655,6 @@ function briefHtml(r) {
     ${alt != null ? `<div class="banner row between"><span>크루즈를 꼭 써야 한다면 ${bi ? '대안 경로 ' + bi : '추천 경로'}가 맡기기 더 좋습니다 · 맡김 구간 ${fmtDist(b.trust.sum[0])}${alt ? `, ${Math.abs(alt)}분 ${alt > 0 ? '더 걸림' : '단축'}` : ''}</span><button class="btn sm primary" data-act="pick" data-arg="${bi}">이 경로로</button></div>` : ''}
     ${ribbon(r, 0, r.len, true)}<div class="rib-ends"><span>${esc(A.origin.name)}</span><span>${esc(A.dest.name)}</span></div>
     <div class="rib-leg">${[0, 1, 2].map(k => k && t.sum[k] ? `<button data-act="segLv" data-arg="${k}"><i class="key l${k}"></i>${LV_KO[k]} <b>${t.sum[k] ? fmtDist(t.sum[k]) : '없음'}</b></button>` : `<span><i class="key l${k}"></i>${LV_KO[k]} <b>${t.sum[k] ? fmtDist(t.sum[k]) : '없음'}</b></span>`).join('')}</div>
-    <p class="note"><b>맡김 구간도 전방 주시와 핸들 대기는 운전자의 몫입니다.</b> 레디맵은 크루즈(ACC)를 켜기 알맞은 구간을 알려 줄 뿐 운전을 대신하지 않습니다.</p>
     <p class="note">크루즈를 켤 만한 구간은 1km 이상 이어지는 맡김 구간만 표시합니다.${t.sum[1] + t.sum[2] ? ' 막대나 주의·직접을 누르면 지도가 그 구간으로 이동합니다.' : ''}</p>
     <p class="note">${r.sig ? (r.sig.length ? `신호 교차로 ${r.sig.length}곳은 앞 150m를 주의로 계산했습니다. 크루즈는 신호를 보고 서지 않습니다.` : '이 경로에서 신호 교차로를 찾지 못했습니다.') : '신호 정보를 아직 받지 못해 시속 55km 이하 시내 구간을 주의로 계산했습니다.'}</p></section>`;
 }
@@ -1755,7 +1665,7 @@ function trafTag(x) {
   return `<span class="tdot" style="background:${CONG[s[4] > 300 ? 4 : bad > 300 ? 3 : s[2] > 500 ? 2 : 1].col}"></span>${lab}${bad >= 100 ? ` · 막힘 ${fmtDist(bad)}` : ''}`;
 }
 function trafPanel(r) {
-  if (!r.tf) return `<div class="tcard"><div class="row between"><b>실시간 교통</b><button class="btn sm" data-act="tab" data-arg="settings">연결하기</button></div><p class="note">${A.trafErr ? esc(A.trafErr) + ' ' : ''}설정에서 TMAP 앱키를 넣으면 막히는 구간을 지도에 색으로 칠하고, 정체가 시작되는 지점을 700m 앞에서 음성으로 알려 줍니다.</p></div>`;
+  if (!r.tf) return `<div class="tcard"><div class="row between"><b>실시간 교통</b><button class="btn sm" data-act="tab" data-arg="settings">연결하기</button></div><p class="note">${A.trafErr ? esc(A.trafErr) + ' ' : ''}설정에서 TMAP 앱키를 넣으면 막히는 구간을 지도에 색으로 칠하고, 정체가 시작되는 지점을 속도 차이에 맞춰 300m~1.2km 앞에서 음성으로 알려 줍니다.</p></div>`;
   const s = trafSummary(r), tot = r.len || 1, runs = trafRuns(r);
   const bar = runs.map(x => `<i style="flex:${((r.cum[x.j1] - r.cum[x.j0]) / tot * 1000).toFixed(1)};background:${CONG[x.cg].col}"></i>`).join('');
   const jams = r.hz.filter(h => h.tpl === 'jam').length, incs = r.hz.filter(h => h.tpl === 'inc').length;
@@ -1776,7 +1686,7 @@ function viewRoute() {
     <div class="row between"><div><h3 class="card-h">출발 전 리허설</h3><p class="note">${r.schoolOk == null ? '어린이보호구역 찾는 중' : r.osmOk == null ? '단속카메라·터널·신호 찾는 중(최대 25초)' : r.osmOk ? `유의지점 ${r.hz.length}곳, 출발지부터 거리순` : '단속카메라·터널은 서버가 바빠 불러오지 못했습니다'}</p></div>${sims ? `<button class="btn sm primary" data-act="playAll">전체 리허설</button>` : ''}</div>
     <div class="tl">${r.hz.length ? r.hz.map(hzItem).join('') : '<p class="note">이 경로에서 찾은 유의지점이 없습니다. 전 구간을 맡김으로 봅니다.</p>'}</div>
     ${trafPanel(r)}
-    <p class="note">리허설 영상은 주차(P) 상태에서만 재생되고, 출발하면 바로 멈춥니다(도로교통법 제49조, Pleos 심사 기준). 주행 중에는 크루즈가 켜져 있을 때만 각 지점 300m 앞(정체·돌발상황은 700m 앞)에서 음성으로 알려 드리고, 맡김 구간은 조용히 지나갑니다.</p>`;
+    <p class="note">리허설은 출발 전 정차 중에만 재생됩니다. 주행 중에는 크루즈가 켜져 있을 때만 각 지점 300m 앞(정체·돌발상황은 700m 앞)에서 음성으로 알려 드리고, 맡김 구간은 조용히 지나갑니다.</p>`;
 }
 function viewPoints() {
   const pts = DB.points.filter(p => (!A.mine || p.mine) && p.tpl !== 'jam' && p.tpl !== 'inc'), pub = DB.points.filter(isPublic).length;
@@ -1811,9 +1721,8 @@ function viewSettings() {
     ${sw('cruiseOnly', '크루즈 작동 중에만 안내', '직접 운전 중일 때는 유의지점을 조용히 지나갑니다. 경고에 무뎌지지 않게 하려는 기본값입니다.')}
     ${sw('checkin', '음성 체크인', '개입 없이 크루즈 주행이 길어지면 유의지점 1km 앞에서 준비 여부를 묻습니다.')}
     <div class="switch"><div><b>체크인 기준 시간</b><div class="note">실제 기본값은 30분입니다. 시연을 위해 짧게 바꿀 수 있습니다.</div></div><span class="seg">${[1, 10, 30].map(n => `<button class="${S.cmin === n ? 'on' : ''}" data-act="cmin" data-arg="${n}">${n}분</button>`).join('')}</span></div>
-    <div class="switch"><div><b>화면 테마</b><div class="note">자동은 전조등이 켜지거나 기기가 어두운 모드일 때 어두운 화면을 씁니다.</div></div><span class="seg">${[['auto', '자동'], ['light', '밝게'], ['dark', '어둡게']].map(o => `<button class="${S.theme === o[0] ? 'on' : ''}" data-act="theme" data-arg="${o[0]}">${o[1]}</button>`).join('')}</span></div>
     ${sw('share', '개입 기록 공유', '끄면 기록이 이 기기에만 남고 모두의 지도에는 반영되지 않습니다.')}
-    <details class="card" id="devSet" style="${NATIVE_KEYS ? 'display:none' : ''}"${A.devOpen ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">개발자 설정 · 교통 API 키</summary><p class="note">키는 이 브라우저(localStorage)에만 저장합니다. 화면 코드에 키를 넣어 배포하면 누구나 볼 수 있으니, 공개 시연은 함께 드린 프록시(proxy.js)에 키를 넣어 쓰세요.</p>
+    <details class="card" id="devSet" style="${NATIVE ? 'display:none' : ''}"${A.devOpen ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">개발자 설정 · 교통 API 키</summary><p class="note">키는 이 브라우저(localStorage)에만 저장합니다. 화면 코드에 키를 넣어 배포하면 누구나 볼 수 있으니, 공개 시연은 함께 드린 프록시(proxy.js)에 키를 넣어 쓰세요.</p>
       <label class="fld"><span>TMAP 앱키 <span class="note">SK open API · 자동차 경로안내(교통정보 포함)</span></span><input type="password" autocomplete="off" spellcheck="false" data-key="tmap" value="${esc(KEYS.tmap)}" placeholder="appKey"></label>
       <label class="fld"><span>ITS 인증키 <span class="note">국가교통정보센터 · 돌발상황정보</span></span><input type="password" autocomplete="off" spellcheck="false" data-key="its" value="${esc(KEYS.its)}" placeholder="apiKey"></label>
       <label class="fld"><span>프록시 주소 <span class="note">브라우저 CORS 차단 시 · 예: http://localhost:8787</span></span><input type="url" autocomplete="off" spellcheck="false" data-key="proxy" value="${esc(KEYS.proxy)}" placeholder="${location.port === '8787' ? '자동: ' + esc(location.origin) : '비워 두면 직접 호출'}"></label>
@@ -1878,7 +1787,6 @@ function live() {
   const c = A.card, el = $('#dCard'); el.hidden = !c; if (c) $('#voice').hidden = true; if (!c) return;
   const h = c.hid && r.hz.find(x => x.id === c.hid), big = h ? (h.m > V.m ? `${fmtDist(h.m - V.m)} 앞 · ${c.short}` : `${c.short} 통과 중`) : c.text;
   const cls = 'dcard ' + c.cls; if (el.className !== cls) el.className = cls;
-  const di = $('#dIco'), ik = h ? h.tpl : c.cls; if (di.dataset.k !== ik) { di.dataset.k = ik; di.innerHTML = ic(h ? TPL[h.tpl].ic : c.cls === 'ok' ? 'M5 12l5 5L20 7' : 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v3', 30); }
   if ($('#dBig').textContent !== big) $('#dBig').textContent = big; if ($('#dSub').textContent !== (c.sub || '')) $('#dSub').textContent = c.sub || '';
 }
 
@@ -1902,7 +1810,7 @@ const ACT = {
   cruiseOff() { if (V.cruise !== 'OFF') setCruise('OFF'); },
   brake: setBrake, brakeToggle() { setBrake(V.brake > 0 ? 0 : 60); },
   scale(n) { V.scale = +n; A.scaleBackup = null; clearTimeout(slowTimer); syncConsole(); },
-  signal(v) { V.signal = v; syncConsole(); }, wiper(v) { V.wiper = v; log('Vehicle', `WiperState ${v}`); syncConsole(); }, light(v) { V.light = v; log('Vehicle', `LowBeamLightState ${v}`); syncConsole(); applyTheme(); },
+  signal(v) { V.signal = v; syncConsole(); }, wiper(v) { V.wiper = v; log('Vehicle', `WiperState ${v}`); syncConsole(); }, light(v) { V.light = v; log('Vehicle', `LowBeamLightState ${v}`); syncConsole(); },
   say: onVoice, others: addOthers,
   tab(t) { A.tab = t; A.confirmReset = false; A.results = null; A.collapsed = false; render(); },
   collapse() { A.collapsed = !A.collapsed; $('#panel').classList.toggle('collapsed', A.collapsed); },
@@ -1926,7 +1834,6 @@ const ACT = {
   simPt(id) { const p = DB.points.find(x => x.id === id); if (p) { A.queue = []; openSim(p.tpl, p.name, '개입 지점 리허설', env()); } },
   flyPt(id) { const p = DB.points.find(x => x.id === id); if (p) { map.easeTo({ center: [p.lon, p.lat], zoom: 15.5, pitch: 0, bearing: 0 }); toast(p.name); } },
   mine(v) { A.mine = !!v; render(); },
-  theme(v) { S.theme = v; save(); applyTheme(); render(); },
   set(k) { S[k] = !S[k]; save(); log('App', `설정 변경: ${k} = ${S[k]}`); render(); }, cmin(n) { S.cmin = +n; save(); render(); },
   reset() { A.confirmReset = true; render(); }, resetNo() { A.confirmReset = false; render(); },
   resetYes() { store.del('nav'); DB = seedDB(); Object.assign(S, DB.settings); DB.settings = S; A.lastTrip = null; A.confirmReset = false; save(); toast('기록을 초기화했습니다'); render(); },
@@ -1934,11 +1841,7 @@ const ACT = {
   testKeys, reload() { if (A.dest && !A.trip) { A.tab = 'home'; loadRoutes(); } },
   sampleTog() { KEYS.sample = !KEYS.sample; saveKeys(); render(); toast(KEYS.sample ? '키가 없을 때 샘플 교통을 표시합니다' : '샘플 교통을 끕니다'); },
 };
-document.addEventListener('click', e => {
-  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
-  if (moving() && !b.closest('.console,.sim-ctl,#fabCon')) { log('UX', '주행 중 화면 조작 차단(도로교통법 제49조 제1항 제11호의2)'); return toast('주행 중에는 화면을 조작할 수 없습니다. “준비”, “여기 위험해”처럼 음성으로 말씀해 주세요.'); }
-  const f = ACT[b.dataset.act]; if (f) f(b.dataset.arg);
-});
+document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b || b.disabled) return; const f = ACT[b.dataset.act]; if (f) f(b.dataset.arg); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && A.sim) ACT.simClose(); });
 document.addEventListener('toggle', e => { if (e.target.id === 'devSet') A.devOpen = e.target.open; }, true);   // 화면을 다시 그려도 개발자 설정이 접히지 않게
 document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.key; if (k) { KEYS[k] = e.target.value.trim(); saveKeys(); A.keyTest = null; toast('저장했습니다. ‘경로 다시 찾기’를 누르면 반영됩니다'); } });
@@ -1974,7 +1877,7 @@ async function runDemo() {
 }
 
 /* ================= boot ================= */
-log('App', `레디맵 시작 · 익명 ID ${DB.id}`);
+log('App', `AVEN 시작 · 익명 ID ${DB.id}`);
 log('Vehicle', 'checkCruiseControlStateCapabilities() → 지원');
 /* 화면에 그리는 위치(F.m)를 실제 위치(V.m)로 매 프레임 부드럽게 따라가게 한다.
    실제 주행은 GPS가 1초에 한 번 오므로 마지막 위치에서 속도만큼 앞으로 내다본다(최대 1.5초) */
